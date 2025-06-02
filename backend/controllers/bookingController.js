@@ -26,6 +26,8 @@ exports.getActivePackage = async (req, res) => {
 
 exports.getAvailableTimeslots = async (req, res) => {
   const tutorId = req.params.tutorId;
+
+  console.log("Acquired ID:", tutorId);
   try {
     const [rows] = await db.query(
        `SELECT * 

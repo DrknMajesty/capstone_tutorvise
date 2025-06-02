@@ -2,6 +2,7 @@ const db = require('../db');
 
 exports.getAvailableTimeslots = async (req, res) => {
   const tutorId = req.params.tutorId;
+  
   try {
     const [rows] = await db.query(
       'SELECT * FROM timeslots WHERE tutor_id = ? ORDER BY start_time',
@@ -57,5 +58,23 @@ exports.deleteTimeslot = async (req, res) => {
   } catch (err) {
     console.error('Error deleting timeslot:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Update a timeslot's status
+exports.updateTimeslotStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['Available', 'Unavailable'].includes(status)) {
+    return res.status(400).json({ message: 'Invalid status value.' });
+  }
+
+  try {
+    await db.query(`UPDATE timeslots SET status = ? WHERE id = ?`, [status, id]);
+    res.json({ message: 'Timeslot status updated successfully.' });
+  } catch (err) {
+    console.error('Error updating timeslot status:', err);
+    res.status(500).json({ message: 'Server error.' });
   }
 };

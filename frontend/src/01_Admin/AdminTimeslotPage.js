@@ -128,6 +128,19 @@ const AdminTimeslotPage = () => {
     })),
   ];
 
+    const handleToggleStatus = async (slot) => {
+    const newStatus = slot.status === 'Available' ? 'Unavailable' : 'Available';
+
+    try {
+      await apiService.put(`/timeslots/update-status/${slot.id}`, {
+        status: newStatus,
+      });
+      fetchTimeslots(selectedTutor);
+    } catch (err) {
+      alert('Failed to update timeslot status');
+    }
+  };
+
   return (
     <>
       <ResponsiveNavbar />
@@ -177,7 +190,6 @@ const AdminTimeslotPage = () => {
                          required
                          options={[
                            { value: 'Available', label: 'Available' },
-                           { value: 'Booked', label: 'Booked' },
                            { value: 'Unavailable', label: 'Unavailable' },
                          ]}
                        />
@@ -202,15 +214,26 @@ const AdminTimeslotPage = () => {
                   <td className="border px-4 py-2">{index + 1}</td>
                   <td className="border px-4 py-2">{formatTime12h(slot.start_time)}</td>
                   <td className="border px-4 py-2">{formatTime12h(slot.end_time)}</td>
-                  <td className="border px-4 py-2">{slot.status}</td>
-                  <td className="border px-4 py-2">
+                  <td className="border px-4 py-2 w-40 whitespace-nowrap text-center">{slot.status}</td>
+                  <td className="border px-4 py-2 text-center">
                     {(slot.status === 'Available' || slot.status === 'Unavailable') && (
-                      <button
-                        onClick={() => { setShowDeleteConfirm(true); setSlotToDelete(slot.id); }}
-                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 ml-6"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex flex-col md:flex-row gap-2 justify-center items-center">
+                        <button
+                          onClick={() => {
+                            setShowDeleteConfirm(true);
+                            setSlotToDelete(slot.id);
+                          }}
+                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(slot)}
+                          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                        >
+                          Update Status
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
