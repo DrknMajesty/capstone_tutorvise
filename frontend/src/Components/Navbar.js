@@ -14,6 +14,7 @@ const menuConfig = {
   ],
   student: [
     { label: "Home", path: "/student/dashboard" },
+    { label: "Bookings", path: "/student/bookings" },
     { label: "Profile", path: "/student/profile" },
   ],
   tutor: [

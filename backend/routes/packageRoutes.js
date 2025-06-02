@@ -16,4 +16,7 @@ router.put('/update-package/:id', authenticateToken, packageController.updatePac
 // Archive Package
 router.put('/archive/:id', authenticateToken, packageController.archivePackage);
 
+// Get Package with 'Active' status for booking
+router.get('/active-packages', authenticateToken, packageController.getActivePackage);
+
 module.exports = router;

@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const packageRoutes = require('./routes/packageRoutes'); // Assuming you have package routes
 const timeslotRoutes = require('./routes/timeslotRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
 const path = require('path');
 
 
@@ -19,8 +20,9 @@ app.use(express.urlencoded({ extended: true }));
 //Routes
 app.use('/api', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/packages', packageRoutes); // Assuming you have package routes
+app.use('/api/packages', packageRoutes);
 app.use('/api/timeslots', timeslotRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

@@ -6,6 +6,7 @@ import ProtectedRoute from './utils/protectedRoutes';
 import LandingPage from './Components/LandingPage'; // adjust path if needed
 import LoginPage from './Components/LoginPage';
 import Unauthorized from './utils/unauthorize';
+import TestPage from './Components/LearningCenterPage';
 
 //Admin Routes
 // import AdminUserPage from './01_Admin/AdminUserPage';
@@ -18,6 +19,7 @@ import AdminTimeslotManagement from './01_Admin/AdminTimeslotPage';
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
 import StudentDashboard from './04_Student/StudentDashboard';
+import StudentBooking from './04_Student/StudentBookingPage';
 
 // Tutor Routes
 import TutorDashboard from './03_Tutor/TutorDashboard';
@@ -32,6 +34,9 @@ function App() {
         {/* Default route redirects to /login */}
         <Route path="/" element={< LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Test Route */}
+        <Route path="/test" element={<TestPage/>}/>
 
         {/* Admin Routes */}
         <Route 
@@ -50,6 +55,7 @@ function App() {
           >
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/profile" element={<StudentProfile />} />
+        <Route path="/student/bookings" element={<StudentBooking />} />
         </Route>
 
         {/* Tutor Routes */}
