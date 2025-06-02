@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: Add custom components */
+@layer components {
+  .login-container {
+    @apply min-h-screen flex items-center justify-center bg-gray-100;
+  }
+
+  .login-box {
+    @apply bg-white p-8 rounded-lg shadow-md w-full max-w-md;
+  }
+
+  .login-title {
+    @apply text-2xl font-bold mb-6 text-center text-blue-700;
+  }
+
+  .login-input {
+    @apply w-full px-4 py-2 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
+  }
+
+  .login-button {
+    @apply w-full bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 transition;
+  }
+
+  .error-message {
+    @apply text-red-500 text-sm mb-4 text-center;
+  }
+}
