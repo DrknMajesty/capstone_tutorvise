@@ -34,7 +34,7 @@ const UserViewModal = ({ user, onClose }) => {
                  src={
                   user.profile_image_url
                     ? `http://localhost:5000/uploads/${user.profile_image_url}`
-                    : '/default-avatar.png'
+                    : '/default-avatar.jpg'
                 }
                 alt="Profile" 
                 className="profile-image"

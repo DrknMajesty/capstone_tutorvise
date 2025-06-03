@@ -10,11 +10,13 @@ const AdminTimeslotPage = () => {
   const [formData, setFormData] = useState({
     start_time: '',
     end_time: '',
-    status: 'Available'
+    status: ''
   });
   const [timeslots, setTimeslots] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchTutors();
@@ -29,8 +31,10 @@ const AdminTimeslotPage = () => {
     try {
       const res = await apiService.get('/users/active-tutors');
       setTutors(res.data);
-    } catch {
-      alert('Failed to fetch tutors');
+    } catch (err) {
+      setError('Failed to fetch tutors');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -148,6 +152,14 @@ const AdminTimeslotPage = () => {
       <div className="items-center justify-center flex flex-col w-full max-w-4xl mx-auto">
         <div className="p-6 font-sans w-full">
           <h1 className='text-2xl font-bold mb-6'>Timeslot Management</h1>
+
+        {loading ? (
+          <p>Loading Tutors...</p>
+        ) : error ? (
+          <p className="text-red-600">{error}</p>
+        ) : tutors.length === 0 ? (
+          <p>No tutors found.</p>
+        ) : (
           <FloatingField
             type="select"
             id="selected_tutor"
@@ -158,6 +170,7 @@ const AdminTimeslotPage = () => {
             required
             options={tutorOptions}
           />
+        )}
         </div>
 
         {selectedTutor && (
@@ -180,19 +193,20 @@ const AdminTimeslotPage = () => {
                          onChange={handleChange}
                          required
                        />
-                       <FloatingField
-                         type="select"
-                         name="status"
-                         id="status"
-                         label="Status"
-                         value={formData.status}
-                         onChange={handleChange}
-                         required
-                         options={[
-                           { value: 'Available', label: 'Available' },
-                           { value: 'Unavailable', label: 'Unavailable' },
-                         ]}
-                       />
+                      <FloatingField
+                        type="select"
+                        name="status"
+                        id="status"
+                        label="Status"
+                        value={formData.status || ""}
+                        onChange={handleChange}
+                        required
+                        options={[
+                          { value: '', label: 'Select Status', disabled: true },
+                          { value: 'Available', label: 'Available' },
+                          { value: 'Unavailable', label: 'Unavailable' },
+                        ]}
+                      />
             <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Timeslot</button>
           </form>
         )}

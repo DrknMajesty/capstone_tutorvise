@@ -286,23 +286,23 @@ exports.deleteUser = async (req, res) => {
 exports.getActiveTutors = async (req, res) => {
   try {
     const [users] = await db.query(
-`SELECT 
-  u.id,
-  u.fname,
-  u.mname,
-  u.lname,
-  tp.user_id,
-  tp.certification,
-  tp.teaching_lvl,
-  tp.subject,
-  tp.credentials,
-  tp.graduate_at,
-  tp.major
-FROM users AS u
-LEFT JOIN tutor_profile AS tp ON u.id = tp.user_id
-WHERE u.account_type = 'tutor' AND u.status = 'active'
-ORDER BY tp.subject DESC`
-
+    `SELECT 
+      u.id,
+      u.fname,
+      u.mname,
+      u.lname,
+      u.profile_image_url,
+      tp.user_id,
+      tp.certification,
+      tp.teaching_lvl,
+      tp.subject,
+      tp.credentials,
+      tp.graduate_at,
+      tp.major
+    FROM users AS u
+    LEFT JOIN tutor_profile AS tp ON u.id = tp.user_id
+    WHERE u.account_type = 'tutor' AND u.status = 'active'
+    ORDER BY tp.subject DESC`
     );
     res.json(users);
   } catch (error) {

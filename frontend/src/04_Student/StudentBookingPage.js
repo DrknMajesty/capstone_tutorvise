@@ -10,17 +10,23 @@ const StudentBookingPage = () => {
   const [selectedTutor, setSelectedTutor] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const userId = parseInt(localStorage.getItem('user_id'), 10);
 
   useEffect(() => {
     fetchPackages();
   }, []);
-
+  
   const fetchPackages = async () => {
     try {
       const res = await apiService.get('/bookings/avail-packages');
       setPackages(res.data);
-    } catch {
-      alert('Failed to fetch packages.');
+    } catch (err) {
+      setError('Failed to fetch packages');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,8 +56,10 @@ const StudentBookingPage = () => {
     setShowModal(true);
     setSelectedTutor(null);
     setSelectedSlot('');
+    setTimeslots([]); // 🧹 Clear previous timeslots
     await fetchTutors();
   };
+
 
   const handleTutorChange = async (e) => {
     const tutor = tutors.find(t => t.id === parseInt(e.target.value));
@@ -65,18 +73,18 @@ const StudentBookingPage = () => {
     if (!selectedTutor || !selectedSlot) {
       return alert('Please select a tutor and timeslot.');
     }
-
     try {
       await apiService.post('/bookings/apply', {
+        student_id: userId,
         package_id: selectedPackage.id,
         tutor_id: selectedTutor.id,
-        timeslot_id: selectedSlot
+        timeslot_id:  parseInt(selectedSlot, 10)
       });
-      alert('Booking submitted. Please wait for admin approval.');
-      setShowModal(false);
-    } catch {
-      alert('Failed to submit booking.');
-    }
+        alert('Booking submitted. Please wait for admin approval.');
+        setShowModal(false);
+      } catch {
+        alert('Failed to submit booking.');
+      }
   };
 
   const formatTime12h = (time) => {
@@ -94,28 +102,43 @@ const StudentBookingPage = () => {
       <div className="h-24" />
 
       <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-6">Book a Tutorial Service</h1>
+        <div className="items-center justify-center flex flex-col w-full max-w-7xl mx-auto px-4">
+          <h1 className="text-3xl font-bold mb-10 text-center">Book a Tutorial Service</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {packages.map((pkg) => (
-            <div key={pkg.id} className="border rounded-lg p-5 shadow">
-              <h3 className="text-xl font-semibold mb-2">{pkg.package_name}</h3>
-              <p><strong>Price:</strong> ₱{pkg.price_package}</p>
-              <p><strong>Sessions:</strong> {pkg.total_sessions}</p>
-              <p><strong>Session Price:</strong> ₱{pkg.price_sessions}</p>
-              <p><strong>Type:</strong> {pkg.tutorial_type}</p>
-              <p className="text-sm text-gray-600 mt-2">{pkg.description}</p>
-              <button
-                onClick={() => handleApplyClick(pkg)}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Apply
-              </button>
+          {loading ? (
+            <p>Loading Available Packages...</p>
+          ) : error ? (
+            <p className="text-red-600">{error}</p>
+          ) : packages.length === 0 ? (
+            <p>No available packages found.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-8 w-full">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="border border-gray-300 rounded-3xl p-8 shadow-2xl bg-white min-h-[280px] flex flex-col justify-between transition-transform transform hover:scale-105"
+                >
+                  <div>
+                    <h3 className="text-2xl font-bold mb-3 text-blue-700">{pkg.package_name}</h3>
+                    <p className="text-lg mb-1"><strong>Total Price:</strong> ₱{pkg.price_package}</p>
+                    <p className="text-lg mb-1"><strong>Sessions:</strong> {pkg.total_sessions}</p>
+                    {/* <p className="text-lg mb-1"><strong>Session Price:</strong> ₱{pkg.price_sessions}</p> */}
+                    <p className="text-lg mb-2 capitalize"><strong>Tutorial Type:</strong> {pkg.tutorial_type}</p>
+                    <p className="text-sm text-gray-600">{pkg.description}</p>
+                  </div>
+                  <button
+                    onClick={() => handleApplyClick(pkg)}
+                    className="mt-6 px-6 py-3 bg-blue-600 text-white font-medium text-lg rounded-xl hover:bg-blue-700"
+                  >
+                    Apply
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
 
+      </div>
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg relative">
@@ -150,14 +173,16 @@ const StudentBookingPage = () => {
                   <img
                     src={`http://localhost:5000/uploads/${selectedTutor.profile_image_url}`}
                     alt="Profile"
-                    className="w-20 h-20 object-cover rounded-full border"
+                    className="w-40 h-40 object-cover rounded-full border"
                   />
                 )}
                 <div>
                   <p><strong>Name:</strong> {selectedTutor.fname} {selectedTutor.lname}</p>
                   {selectedTutor.certification && <p><strong>Certification:</strong> {selectedTutor.certification}</p>}
-                  {selectedTutor.subject && <p><strong>Subject:</strong> {selectedTutor.subject}</p>}
-                  {selectedTutor.teaching_lvl && <p><strong>Level:</strong> {selectedTutor.teaching_lvl}</p>}
+                  {selectedTutor.subject && <p><strong>Subject Expertise:</strong> {selectedTutor.subject}</p>}
+                  {selectedTutor.teaching_lvl && <p><strong>Academic Level:</strong> {selectedTutor.teaching_lvl}</p>}
+                  {selectedTutor.credentials && <p><strong>Credentials:</strong> {selectedTutor.credentials}</p>}
+                  {selectedTutor.graduate_at && <p><strong>Graduate At:</strong> {selectedTutor.graduate_at}</p>}
                 </div>
               </div>
             )}

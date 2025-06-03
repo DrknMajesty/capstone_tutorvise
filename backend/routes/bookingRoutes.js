@@ -10,4 +10,8 @@ router.get('/avail-packages', authenticateToken, bookingController.getActivePack
 // Get Selected Tutor Timeslots with "Available" status for booking
 router.get('/book-timeslots/:tutorId', authenticateToken, bookingController.getAvailableTimeslots)
 
+// Package Application
+router.post('/apply', authenticateToken, bookingController.submitApplication);
+
+
 module.exports = router;

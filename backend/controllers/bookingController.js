@@ -27,7 +27,6 @@ exports.getActivePackage = async (req, res) => {
 exports.getAvailableTimeslots = async (req, res) => {
   const tutorId = req.params.tutorId;
 
-  console.log("Acquired ID:", tutorId);
   try {
     const [rows] = await db.query(
        `SELECT * 
@@ -40,5 +39,52 @@ exports.getAvailableTimeslots = async (req, res) => {
   } catch (err) {
     console.error('Error fetching timeslots:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.submitApplication = async (req, res) => {
+  const { student_id, package_id, tutor_id, timeslot_id } = req.body;
+
+  if (!student_id || !package_id || !tutor_id || !timeslot_id) {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
+
+  try {
+    // Fetch timeslot snapshot
+    const [timeslotRows] = await db.query(
+      `SELECT start_time, end_time, status FROM timeslots WHERE id = ?`,
+      [timeslot_id]
+    );
+
+    if (timeslotRows.length === 0) {
+      return res.status(404).json({ message: 'Timeslot not found.' });
+    }
+
+    const timeslot = timeslotRows[0];
+
+    // Save application with snapshot info
+    await db.query(
+      `INSERT INTO applications 
+        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        student_id,
+        package_id,
+        tutor_id,
+        timeslot_id,
+        timeslot.start_time,
+        timeslot.end_time,
+      ]
+    );
+
+    await db.query(
+      `UPDATE timeslots SET status = 'pending' WHERE id = ?`,
+      [timeslot_id]
+    );
+
+    res.json({ message: 'Application submitted successfully.' });
+  } catch (err) {
+    console.error('Error submitting application:', err);
+    res.status(500).json({ message: 'Server error.' });
   }
 };
