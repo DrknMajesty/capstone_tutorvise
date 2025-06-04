@@ -80,23 +80,41 @@ const AdminTimeslotPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!selectedTutor) return alert('Please select a tutor');
 
-    // Check for overlapping time in frontend
+    const { start_time, end_time } = formData;
+
+    // Basic validation
+    if (!start_time || !end_time || start_time >= end_time) {
+      return alert('Please enter a valid start and end time.');
+    }
+
+    // Convert time string to Date for accurate comparison
+    const toDate = (time) => new Date(`1970-01-01T${time}`);
+
+    const newStart = toDate(start_time);
+    const newEnd = toDate(end_time);
+
+    // Overlap validation
     const overlap = timeslots.some((slot) => {
-      return (
-        (formData.start_time < slot.end_time) &&
-        (formData.end_time > slot.start_time)
-      );
+      const existingStart = toDate(slot.start_time);
+      const existingEnd = toDate(slot.end_time);
+
+      return newStart < existingEnd && newEnd > existingStart;
     });
 
-    if (overlap) return alert('Time conflict detected. Please adjust the time.');
+    if (overlap) {
+      return alert('Time conflict detected. Please adjust the time.');
+    }
 
+    // Submit to backend
     try {
       await apiService.post('/timeslots/create', {
         tutor_id: selectedTutor,
-        ...formData
+        ...formData,
       });
+
       setFormData({ start_time: '', end_time: '', status: 'Available' });
       fetchTimeslots(selectedTutor);
     } catch (err) {

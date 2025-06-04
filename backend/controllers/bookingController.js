@@ -62,11 +62,14 @@ exports.submitApplication = async (req, res) => {
 
     const timeslot = timeslotRows[0];
 
-    // Save application with snapshot info
+    // ⏳ Calculate deadline: 10 minutes from now
+    const deadline = new Date(Date.now() + 1 * 60 * 1000); // 10 minutes in ms
+
+    // Save application with deadline and snapshot info
     await db.query(
       `INSERT INTO applications 
-        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time, deadline)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         student_id,
         package_id,
@@ -74,6 +77,7 @@ exports.submitApplication = async (req, res) => {
         timeslot_id,
         timeslot.start_time,
         timeslot.end_time,
+        deadline,
       ]
     );
 
@@ -82,7 +86,7 @@ exports.submitApplication = async (req, res) => {
       [timeslot_id]
     );
 
-    res.json({ message: 'Application submitted successfully.' });
+    res.json({ message: 'Application submitted successfully.', deadline });
   } catch (err) {
     console.error('Error submitting application:', err);
     res.status(500).json({ message: 'Server error.' });

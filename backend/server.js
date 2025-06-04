@@ -4,11 +4,18 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
-const packageRoutes = require('./routes/packageRoutes'); // Assuming you have package routes
+const packageRoutes = require('./routes/packageRoutes');
 const timeslotRoutes = require('./routes/timeslotRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const applicationRoutes = require('./routes/applicationRoutes');
 const path = require('path');
+const cron = require('node-cron');
+const expireOldApplications = require('./utils/expireApplications');
 
+// Application Expiration 
+cron.schedule('* * * * *', async () => {
+  await expireOldApplications();
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,6 +30,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/timeslots', timeslotRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/applications', applicationRoutes);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
