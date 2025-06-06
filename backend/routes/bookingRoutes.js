@@ -13,5 +13,16 @@ router.get('/book-timeslots/:tutorId', authenticateToken, bookingController.getA
 // Package Application
 router.post('/apply', authenticateToken, bookingController.submitApplication);
 
+// Book dates for sessions
+router.post('/schedule-sessions', authenticateToken, bookingController.scheduleSessions);
+
+// Get all All aplications with bookings
+router.get('/all-bookings', authenticateToken, bookingController.getAllApplicationsWithBookings);
+
+// GET bookings for a specific tutor
+router.get('/tutors/:tutorId/bookings', authenticateToken, bookingController.getBookingsForTutor);
+
+// POST accept a booking
+router.post('/bookings/:bookingId/accept', authenticateToken, bookingController.acceptBooking);
 
 module.exports = router;

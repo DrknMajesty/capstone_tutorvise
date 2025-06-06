@@ -2,28 +2,28 @@
 const TOKEN_KEY = 'authToken'; // Consistent key
 
 export const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 };
 
 export const saveToken = (token) => {
-  console.trace("🔍 saveToken called:", token); // <--- will log the full stack
   if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem(TOKEN_KEY, token);
     const { id, username, account_type } = parseJwt(token);
-    if (id) localStorage.setItem('user_id', id);
-    if (account_type) localStorage.setItem('account_type', account_type);
-    if (username) localStorage.setItem('username', username);
+    if (id) sessionStorage.setItem('user_id', id);
+    if (account_type) sessionStorage.setItem('account_type', account_type);
+    if (username) sessionStorage.setItem('username', username);
   }
 };
 
 export const clearToken = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem('account_type'); // ✅ match saved key
-  localStorage.removeItem('user_id');
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem('account_type'); // ✅ match saved key
+  sessionStorage.removeItem('user_id');
+  sessionStorage.removeItem('username');
 };
 
 export const getUserRole = () => {
-  return localStorage.getItem('account_type'); // ✅ match saved key
+  return sessionStorage.getItem('account_type'); // ✅ match saved key
 };
 
 // JWT decode helper

@@ -15,6 +15,8 @@ import AdminProfile from './01_Admin/AdminProfile';
 import AdminUserManagement from './01_Admin/AdminUserPage';
 import AdminPackageManagement from './01_Admin/AdminPackage';
 import AdminTimeslotManagement from './01_Admin/AdminTimeslotPage';
+import AdminPaymentManagement from './01_Admin/AdminPayment';
+import AdminBookingManagement from './01_Admin/AdminBooking';
 
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
@@ -24,6 +26,7 @@ import StudentBooking from './04_Student/StudentBookingPage';
 // Tutor Routes
 import TutorDashboard from './03_Tutor/TutorDashboard';
 import TutorProfile from './03_Tutor/TutorProfile';
+import TutorBooking from './03_Tutor/TutorBooking';
 
 
 function App() {
@@ -47,6 +50,8 @@ function App() {
           <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="/admin/packages" element={<AdminPackageManagement />} />
           <Route path="/admin/timeslots" element={<AdminTimeslotManagement />} />
+          <Route path="/admin/payments" element={<AdminPaymentManagement />} />
+          <Route path="/admin/bookings" element={<AdminBookingManagement />} />
         </Route>
 
         {/* Student Routes */}
@@ -64,6 +69,7 @@ function App() {
         >
         <Route path="/tutor/dashboard" element={<TutorDashboard />} />    
         <Route path="/tutor/profile" element={<TutorProfile />} />
+        <Route path="/tutor/bookings" element={<TutorBooking /> } />
         </Route>
         
         {/* Add other routes here */}

@@ -7,7 +7,7 @@ const Unauthorized = () => {
 
   useEffect(() => {
     // Clear user session on unauthorized access
-    localStorage.clear();
+    sessionStorage.clear();
 
     // Countdown timer
     const interval = setInterval(() => {

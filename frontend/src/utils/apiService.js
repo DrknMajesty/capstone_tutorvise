@@ -26,7 +26,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Token expired or invalid – force logout
-      localStorage.clear();
+      sessionStorage.clear();
       window.location.href = '/login'; // or navigate('/login') if using React Router
     }
     return Promise.reject(error);

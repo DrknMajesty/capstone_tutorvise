@@ -23,8 +23,8 @@ const AdminProfile = () => {
 });
 
   const [loading, setLoading] = useState(true);
-  const userId = localStorage.getItem('user_id');
-  const username = localStorage.getItem('username');
+  const userId = sessionStorage.getItem('user_id');
+  const username = sessionStorage.getItem('username');
 
   // Convert middle name to abbreviated form
   const abbreviateMiddleName = (middleName) => {

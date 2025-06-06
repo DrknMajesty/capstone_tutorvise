@@ -1,36 +1,52 @@
 // utils/expireApplications.js
-const db = require('../db'); // Adjust path to your DB config
+const db = require('../db');
 
 const expireOldApplications = async () => {
+  const connection = await db.getConnection();
   try {
-    const [expiredApps] = await db.query(
+    await connection.beginTransaction();
+
+    // Find applications that should be expired
+    const [expiredApps] = await connection.query(
       `SELECT id, timeslot_id FROM applications 
-       WHERE application_status = 'pending' 
-       AND deadline < NOW()`
+       WHERE application_status = 'Pending' 
+       AND deadline < NOW()
+       AND (payment_proof IS NULL OR payment_proof = '')`
     );
 
-    if (expiredApps.length === 0) return;
+    if (expiredApps.length === 0) {
+      await connection.commit();
+      return { expiredCount: 0 };
+    }
 
-    const applicationIds = expiredApps.map(app => app.id);
-    const timeslotIds = expiredApps.map(app => app.timeslot_id);
+    // Free up each timeslot
+    for (const app of expiredApps) {
+      if (app.timeslot_id) {
+        await connection.query(
+          `UPDATE timeslots 
+           SET status = 'available' 
+           WHERE id = ?`,
+          [app.timeslot_id]
+        );
+      }
 
-    await db.query(
-      `UPDATE applications 
-       SET application_status = 'expired' 
-       WHERE id IN (?)`,
-      [applicationIds]
-    );
+      await connection.query(
+        `UPDATE applications 
+         SET application_status = 'Expired' 
+         WHERE id = ?`,
+        [app.id]
+      );
+    }
 
-    await db.query(
-      `UPDATE timeslots 
-       SET status = 'available' 
-       WHERE id IN (?)`,
-      [timeslotIds]
-    );
-
-    console.log(`✅ Expired ${applicationIds.length} application(s).`);
+    await connection.commit();
+    console.log(`✅ Expired ${expiredApps.length} application(s) and freed timeslots`);
+    return { expiredCount: expiredApps.length };
   } catch (err) {
+    await connection.rollback();
     console.error('❌ Error expiring applications:', err);
+    throw err;
+  } finally {
+    connection.release();
   }
 };
 
