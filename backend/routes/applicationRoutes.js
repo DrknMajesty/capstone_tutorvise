@@ -16,10 +16,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Admin routes
+router.get('/all-submitted', applicationController.getSubmittedApplications);
+router.put('/approve/:id', applicationController.approveApplication);
+router.put('/reject/:id', applicationController.rejectApplication);
+
 // Get current student's application (latest one)
 router.get('/my-applications/:studentId', authenticateToken, applicationController.getMyApplication);
 
 // Submit proof of payment
 router.post('/submit-proof/:applicationId', authenticateToken, upload.single('payment_proof'), applicationController.submitPaymentProof);
 
+// Cancel Student Application
+router.post('/cancel/:id', authenticateToken, applicationController.cancelApplication);
+
+// Bulk expiration route
+router.post('/expire-applications', applicationController.expireApplicationsBulk);
+
+// Manual/specific expiration
+router.post('/expire/:id', applicationController.expireSingleApplication);
+
 module.exports = router;
+

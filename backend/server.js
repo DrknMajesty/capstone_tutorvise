@@ -9,22 +9,43 @@ const timeslotRoutes = require('./routes/timeslotRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const path = require('path');
-const cron = require('node-cron');
-const expireOldApplications = require('./utils/expireApplications');
-
-// Application Expiration 
-cron.schedule('* * * * *', async () => {
-  await expireOldApplications();
-});
+const db = require('./db'); // Make sure you have this import
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Enhanced CORS configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-//Routes
+// Database connection check
+db.getConnection()
+  .then(connection => {
+    console.log('✅ Database connection established');
+    connection.release();
+  })
+  .catch(err => {
+    console.error('❌ Database connection failed:', err);
+    process.exit(1);
+  });
+
+// Application Expiration - Run every hour instead of every minute
+// cron.schedule('0 * * * *', async () => {
+//   console.log('⏰ Running scheduled application expiration check...');
+//   try {
+//     const result = await expireOldApplications();
+//     console.log(`✅ Expired ${result.expiredCount} application(s)`);
+//   } catch (err) {
+//     console.error('❌ Error in expiration job:', err);
+//   }
+// });
+
+// Routes
 app.use('/api', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/packages', packageRoutes);
@@ -35,6 +56,18 @@ app.use('/api/applications', applicationRoutes);
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('🚨 Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📅 Application expiration job scheduled hourly`);
 });

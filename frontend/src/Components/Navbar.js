@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Menu, X} from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import "../Styles/Navbar.css";
+import { clearToken } from '../utils/tokenService';
 
 // 🔶 Menu configuration per role
 const menuConfig = {
@@ -10,7 +11,10 @@ const menuConfig = {
     { label: "Users", path: "/admin/users" },
     { label: "Packages", path: "/admin/packages" },
     { label: "Timeslots", path:"/admin/timeslots" },
+    { label: "Applications", path:"/admin/payments"},
+    { label: "Bookings", path: "/admin/bookings" },
     { label: "Profile", path: "/admin/profile" },
+
   ],
   student: [
     { label: "Home", path: "/student/dashboard" },
@@ -19,6 +23,7 @@ const menuConfig = {
   ],
   tutor: [
     { label: "Home", path: "/tutor/dashboard" },
+    { label: "Bookings", path: "/tutor/bookings" },
     { label: "Profile", path: "/tutor/profile" },
   ]
 };
@@ -32,16 +37,13 @@ export default function ResponsiveNavbar() {
   const toggleSidebar = () => setIsOpen(!isOpen);
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user_id");
-    localStorage.removeItem("account_type");
-    localStorage.removeItem("username");
+    clearToken();
     navigate("/");
   };
 
   // 🔶 Load user and set menu based on role
   useEffect(() => {
-    const accountType = localStorage.getItem("account_type");
+    const accountType = sessionStorage.getItem("account_type");
     if (accountType) {
       setMenuItems(menuConfig[accountType] || []);
     }
@@ -70,7 +72,7 @@ export default function ResponsiveNavbar() {
               <div className="w-1 h-10 bg-white mr-2" />
 
               <h2 className="navbar-username">
-                 {localStorage.getItem("username") || "User"}
+                 {sessionStorage.getItem("username") || "User"}
               </h2>
               </>
             )}

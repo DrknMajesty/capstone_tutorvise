@@ -3,8 +3,8 @@ import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService'; // ✅ make sure this handles GET /users/all
 
 const AdminDashboard = () => {
-  const username = localStorage.getItem('username') || 'User';
-  const account_type = localStorage.getItem('account_type') || 'Admin';
+  const username = sessionStorage.getItem('username') || 'User';
+  const account_type = sessionStorage.getItem('account_type') || 'Admin';
 
   const [counts, setCounts] = useState({
     student: 0,

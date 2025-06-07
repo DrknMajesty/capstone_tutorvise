@@ -2,7 +2,7 @@
 import { Navigate, Outlet } from 'react-router-dom';
 
 const ProtectedRoute = ({ allowed_type }) => {
-  const userType = localStorage.getItem('account_type');
+  const userType = sessionStorage.getItem('account_type');
 
   return userType === allowed_type
     ? <Outlet />

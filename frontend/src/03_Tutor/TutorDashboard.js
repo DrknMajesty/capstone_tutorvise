@@ -2,9 +2,9 @@ import React from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 
 const TutorDashboard = () => {
-  // Get user info from localStorage
-  const username = localStorage.getItem('username') || 'User';
-  const role = localStorage.getItem('account_type') || 'User';
+  // Get user info from sessionStorage
+  const username = sessionStorage.getItem('username') || 'User';
+  const role = sessionStorage.getItem('account_type') || 'User';
 
   return (
     <div>
