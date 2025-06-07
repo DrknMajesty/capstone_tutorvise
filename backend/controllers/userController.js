@@ -8,7 +8,7 @@ const path = require('path');
 exports.getAllUsers = async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT * FROM users WHERE account_type IN ('admin staff', 'tutor', 'student') and status = 'active' ORDER BY id DESC"
+      "SELECT * FROM users WHERE status = 'active' ORDER BY id DESC"
     );
     res.json(users);
   } catch (error) {
