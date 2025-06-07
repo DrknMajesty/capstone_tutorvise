@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import ResponsiveNavbar from '../Components/Navbar';
 import FloatingField from '../Components/FloatingFields';
 import apiService from '../utils/apiService';
@@ -17,6 +18,8 @@ const AdminTimeslotPage = () => {
   const [slotToDelete, setSlotToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
     fetchTutors();
@@ -26,6 +29,26 @@ const AdminTimeslotPage = () => {
     if (selectedTutor) fetchTimeslots(selectedTutor);
     else setTimeslots([]);
   }, [selectedTutor]);
+
+  useEffect(() => {
+      if (alert.show) {
+        // Start fade-out after 3.5s
+        const fadeTimer = setTimeout(() => {
+          setFadeOut(true);
+        }, 3500);
+  
+        // Fully hide after fade ends (e.g., 500ms later)
+        const hideTimer = setTimeout(() => {
+          setAlert({ ...alert, show: false });
+          setFadeOut(false); // reset
+        }, 4000);
+  
+        return () => {
+          clearTimeout(fadeTimer);
+          clearTimeout(hideTimer);
+        };
+      }
+    }, [alert]);
 
   const fetchTutors = async () => {
     try {
@@ -43,7 +66,8 @@ const AdminTimeslotPage = () => {
       const res = await apiService.get(`/timeslots/available-slots/${tutorId}`);
       setTimeslots(res.data);
     } catch {
-      alert('Failed to fetch timeslots');
+      setAlert({ message: 'Failed to fetch timeslots.', severity: 'error', show: true });
+      // alert('Failed to fetch timeslots');
     }
   };
 
@@ -81,13 +105,16 @@ const AdminTimeslotPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedTutor) return alert('Please select a tutor');
+    if (!selectedTutor) 
+      return setAlert({ message: 'Please select a tutor.', severity: 'error', show: true });
+    // alert('Please select a tutor');
 
     const { start_time, end_time } = formData;
 
     // Basic validation
     if (!start_time || !end_time || start_time >= end_time) {
-      return alert('Please enter a valid start and end time.');
+      return setAlert({ message: 'Please enter a valid start and end time.', severity: 'error', show: true });
+      // return alert('Please enter a valid start and end time.');
     }
 
     // Convert time string to Date for accurate comparison
@@ -105,7 +132,8 @@ const AdminTimeslotPage = () => {
     });
 
     if (overlap) {
-      return alert('Time conflict detected. Please adjust the time.');
+      return setAlert({ message: 'Time conflict detected. Please adjust the time.', severity: 'error', show: true });
+      // return alert('Time conflict detected. Please adjust the time.');
     }
 
     // Submit to backend
@@ -116,9 +144,11 @@ const AdminTimeslotPage = () => {
       });
 
       setFormData({ start_time: '', end_time: '', status: 'Available' });
+      setAlert({ message: 'Timeslot Created Sucessfully.', severity: 'success', show: true });
       fetchTimeslots(selectedTutor);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create timeslot.');
+      setAlert({ message: err.response?.data?.message || 'Failed to create timeslot.', severity: 'error', show: true });
+      // alert(err.response?.data?.message || 'Failed to create timeslot.');
     }
   };
 
@@ -126,9 +156,11 @@ const AdminTimeslotPage = () => {
     try {
       await apiService.delete(`/timeslots/delete/${slotToDelete}`);
       setShowDeleteConfirm(false);
+      setAlert({ message: 'Timeslot Deleted.', severity: 'success', show: true });
       fetchTimeslots(selectedTutor);
     } catch {
-      alert('Failed to delete timeslot.');
+      setAlert({ message: 'Failed to delete timeslot.', severity: 'error', show: true });
+      // alert('Failed to delete timeslot.');
     }
   };
 
@@ -157,9 +189,11 @@ const AdminTimeslotPage = () => {
       await apiService.put(`/timeslots/update-status/${slot.id}`, {
         status: newStatus,
       });
+      setAlert({ message: `Status updated to "${newStatus}".`, severity: 'success', show: true });
       fetchTimeslots(selectedTutor);
     } catch (err) {
-      alert('Failed to update timeslot status');
+      setAlert({ message: 'Failed to update timeslot status.', severity: 'error', show: true });
+      // alert('Failed to update timeslot status');
     }
   };
 
@@ -289,6 +323,21 @@ const AdminTimeslotPage = () => {
           </div>
         </div>
       )}
+
+      {alert.show && (
+              <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+                fadeOut ? 'opacity-0' : 'opacity-100'
+                }`}
+              >
+                  <Alert
+                    severity={alert.severity}
+                    onClose={() => setAlert({ ...alert, show: false })}
+                    variant="filled"
+                  >
+                    {alert.message}
+                  </Alert>
+                </div>
+              )}
     </>
   );
 };

@@ -1,14 +1,37 @@
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import ResponsiveNavbar from '../Components/Navbar';
 
 const AdminApplicationManagementPage = () => {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
     fetchApplications();
   }, []);
+
+  useEffect(() => {
+    if (alert.show) {
+      // Start fade-out after 3.5s
+      const fadeTimer = setTimeout(() => {
+        setFadeOut(true);
+      }, 3500);
+
+      // Fully hide after fade ends (e.g., 500ms later)
+      const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+        setFadeOut(false); // reset
+      }, 4000);
+    
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
 
   const fetchApplications = async () => {
     try {
@@ -24,20 +47,20 @@ const AdminApplicationManagementPage = () => {
   const handleApprove = async (id) => {
     try {
       await apiService.put(`/applications/approve/${id}`); // Your backend handles expiration logic
-      alert('Application approved.');
+      setAlert({ message: 'Application approved.', severity: 'success', show: true });
       fetchApplications(); // refresh list
     } catch {
-      alert('Failed to approve application.');
+      setAlert({ message: 'Failed to approve application.', severity: 'error', show: true });
     }
   };
 
   const handleReject = async (id) => {
     try {
       await apiService.put(`/applications/reject/${id}`);
-      alert('Application rejected.');
+        setAlert({ message: 'Application rejected.', severity: 'success', show: true });
       fetchApplications();
     } catch {
-      alert('Failed to reject application.');
+      setAlert({ message: 'Failed to reject application.', severity: 'error', show: true });
     }
   };
 
@@ -110,6 +133,21 @@ const AdminApplicationManagementPage = () => {
       </div>
     )}
   </div>
+
+  {alert.show && (
+    <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+      fadeOut ? 'opacity-0' : 'opacity-100'
+      }`}
+    >
+      <Alert
+        severity={alert.severity}
+        onClose={() => setAlert({ ...alert, show: false })}
+        variant="filled"
+      >
+        {alert.message}
+      </Alert>
+    </div>
+  )}
 </>
   );
 };

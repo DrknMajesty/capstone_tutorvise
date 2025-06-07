@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import BookingList from '../Components/BookingList';
 import ResponsiveNavbar from '../Components/Navbar';
@@ -7,6 +8,8 @@ const AdminBooking = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
     const fetchBookings = async () => {
     setLoading(true);
@@ -27,16 +30,36 @@ const AdminBooking = () => {
   const handleAccept = async (bookingId) => {
     try {
       await apiService.post(`/bookings/accept/${bookingId}`);
-      alert('Booking accepted.');
+      setAlert({ message: 'Booking accepted successfully.', severity: 'success', show: true });
       fetchBookings();
     } catch (err) {
-      alert('Failed to accept booking.');
+      setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
     }
   };
 
   useEffect(() => {
     fetchBookings();
   }, []);
+
+  useEffect(() => {
+    if (alert.show) {
+      // Start fade-out after 3.5s
+      const fadeTimer = setTimeout(() => {
+        setFadeOut(true);
+      }, 3500);
+  
+        // Fully hide after fade ends (e.g., 500ms later)
+      const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+        setFadeOut(false); // reset
+      }, 4000);
+      
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
 
   return (
     <>
@@ -51,6 +74,21 @@ const AdminBooking = () => {
           )}
         </div>
       </div>
+
+      {alert.show && (
+        <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+          fadeOut ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <Alert
+            severity={alert.severity}
+            onClose={() => setAlert({ ...alert, show: false })}
+            variant="filled"
+          >
+            {alert.message}
+          </Alert>
+        </div>
+      )}
     </>
   );
 };

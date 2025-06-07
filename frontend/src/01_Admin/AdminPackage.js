@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import ResponsiveNavbar from '../Components/Navbar';
 import FloatingField from '../Components/FloatingFields';
@@ -13,6 +14,8 @@ const AdminPackage = () => {
   const [viewingPackage, setViewingPackage] = useState(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState({ id: null, package_name: '' });
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   const [formData, setFormData] = useState({
     package_name: '',
@@ -43,6 +46,26 @@ const AdminPackage = () => {
     fetchPackages();
   }, []);
 
+  useEffect(() => {
+    if (alert.show) {
+      // Start fade-out after 3.5s
+      const fadeTimer = setTimeout(() => {
+        setFadeOut(true);
+      }, 3500);
+  
+        // Fully hide after fade ends (e.g., 500ms later)
+      const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+        setFadeOut(false); // reset
+      }, 4000);
+      
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -68,11 +91,11 @@ const AdminPackage = () => {
     try {
       const res = await apiService.post('/packages/create-package', formData);
       if (res.status !== 200) throw new Error('Failed to create package');
-      alert('Package created successfully!');
+      setAlert({ message: 'Package created successfully!', severity: 'success', show: true });
       resetForm();
       fetchPackages();
     } catch (err) {
-      alert(err.response?.data?.message || err.message);
+      setAlert({ message: err.response?.data?.message || err.message, severity: 'error', show: true });
     }
   };
 
@@ -96,11 +119,11 @@ const AdminPackage = () => {
     try {
       const res = await apiService.put(`/packages/update-package/${editingId}`, formData);
       if (res.status !== 200) throw new Error('Failed to update package');
-      alert('Package updated successfully!');
+      setAlert({ message: 'Package updated successfully!', severity: 'success', show: true });
       resetForm();
       fetchPackages();
     } catch (err) {
-      alert(err.response?.data?.message || err.message);
+      setAlert({ message: err.response?.data?.message || err.message, severity: 'success', show: true });
     }
   };
 
@@ -123,12 +146,12 @@ const AdminPackage = () => {
   const handleArchivePackage = async () => {
     try {
       await apiService.put(`packages/archive/${selectedPackage.id}`);
-      alert('Package archived successfully.');
+      setAlert({ message: `Package ID #${selectedPackage.id} archived successfully.`, severity: 'success', show: true });
       setShowArchiveModal(false);
       // Optional: trigger a refetch or update the local state to reflect the change
     } catch (err) {
       console.error('Failed to archive:', err);
-      alert('Failed to archive the package.');
+      setAlert({ message: 'Failed to archive package.', severity: 'error', show: true });
     }
     fetchPackages();
   };
@@ -372,6 +395,21 @@ const AdminPackage = () => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {alert.show && (
+          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+            fadeOut ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            <Alert
+              severity={alert.severity}
+              onClose={() => setAlert({ ...alert, show: false })}
+              variant="filled"
+            >
+              {alert.message}
+            </Alert>
           </div>
         )}
     </>

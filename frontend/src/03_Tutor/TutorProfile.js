@@ -1,5 +1,6 @@
 // AdminProfile.js
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import apiClient from '../utils/apiService';
 import ResponsiveNavbar from '../Components/Navbar';
 
@@ -24,11 +25,13 @@ const TutorProfile = () => {
     major: '',
   }); 
   const [passwordData, setPasswordData] = useState({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-});
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const userId = sessionStorage.getItem('user_id');
   const username = sessionStorage.getItem('username');
@@ -63,11 +66,11 @@ const TutorProfile = () => {
       newPassword,
     });
 
-    alert('Password updated successfully.');
+    setAlert({ message: 'Password updated successfully.', severity: 'success', show: true });
     setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
   } catch (err) {
     console.error('Failed to update password:', err);
-    alert(err.response?.data?.message || 'Failed to update password.');
+    setAlert({ message: err.response?.data?.message || 'Failed to update password.', severity: 'error', show: true });
   }
 };
   const formatDate = (isoDateString) => {
@@ -113,16 +116,35 @@ const TutorProfile = () => {
     if (userId) fetchUser();
     
     const fetchTutorProfile = async () => {
-    try { 
-      const res = await apiClient.get(`/users/profile/tutor/${userId}`);
-      setProfileData(res.data);
-    } catch (err) {
-      console.error('Failed to fetch student profile:', err);  
-    }   
-  };
+      try { 
+        const res = await apiClient.get(`/users/profile/tutor/${userId}`);
+        setProfileData(res.data);
+      } catch (err) {
+        console.error('Failed to fetch student profile:', err);  
+      }   
+    };
     if (userId) fetchTutorProfile();
   }, [userId]);
 
+  useEffect(() => {
+    if (alert.show) {
+      // Start fade-out after 3.5s
+      const fadeTimer = setTimeout(() => {
+        setFadeOut(true);
+      }, 3500);
+  
+        // Fully hide after fade ends (e.g., 500ms later)
+      const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+        setFadeOut(false); // reset
+      }, 4000);
+      
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
     
   return (
    <>
@@ -196,6 +218,21 @@ const TutorProfile = () => {
              </button>
            </div>
          </div>
+         
+        {alert.show && (
+          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+            fadeOut ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            <Alert
+              severity={alert.severity}
+              onClose={() => setAlert({ ...alert, show: false })}
+              variant="filled"
+            >
+              {alert.message}
+            </Alert>
+          </div>
+        )}
        </>
   );
 };

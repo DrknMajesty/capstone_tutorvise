@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
 
@@ -20,6 +21,8 @@ const StudentBookingPage = () => {
   const [selectedDates, setSelectedDates] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedWeekday, setSelectedWeekday] = useState(null);
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -28,6 +31,25 @@ const StudentBookingPage = () => {
 
   const [bookedDates, setBookedDates] = useState([]);
 
+  useEffect(() => {
+    if (alert.show) {
+      // Start fade-out after 3.5s
+      const fadeTimer = setTimeout(() => {
+        setFadeOut(true);
+      }, 3500);
+  
+        // Fully hide after fade ends (e.g., 500ms later)
+      const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+        setFadeOut(false); // reset
+      }, 4000);
+      
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
   // Calendar functions
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -113,7 +135,7 @@ const StudentBookingPage = () => {
       } else if (prev.length < application.remaining_sessions) {
         return [...prev, dateStr];
       } else {
-        alert(`You can only book up to ${application.total_sessions} sessions.`);
+        setAlert({ message: `You can only book up to ${application.total_sessions} sessions.`, severity: 'error', show: true });
         return prev;
       }
     });
@@ -154,14 +176,15 @@ const handleWeekdaySelect = (weekdayIndex) => {
     const remaining = application.remaining_sessions - prev.length;
 
     if (remaining <= 0) {
-      alert(`You can only book up to ${application.total_sessions} sessions.`);
+      setAlert({ message: `You can only book up to ${application.total_sessions} sessions.`, severity: 'error', show: true });
       return prev;
     }
 
     const datesToAdd = newDates.filter(date => !prev.includes(date)).slice(0, remaining);
 
     if (datesToAdd.length < newDates.length) {
-      alert(`Only ${datesToAdd.length} of the selected dates could be added (limit: ${application.total_sessions}).`);
+      setAlert({ message: `Only ${datesToAdd.length} of the selected dates could be added (limit: ${application.total_sessions}).`, severity: 'warning', show: true });
+      // alert(`Only ${datesToAdd.length} of the selected dates could be added (limit: ${application.total_sessions}).`);
     }
 
     return [...prev, ...datesToAdd];
@@ -171,7 +194,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
 
   const handleSessionBooking = async () => {
     if (selectedDates.length === 0) {
-      return alert('Please select at least one date');
+      setAlert({ message: 'Please select at least one date.', severity: 'error', show: true });
     }
 
     try {
@@ -179,13 +202,13 @@ const handleWeekdaySelect = (weekdayIndex) => {
         application_id: application.id,
         dates: selectedDates
       });
-      alert('Sessions booked successfully!');
+      setAlert({ message: 'Sessions booked successfully!', severity: 'success', show: true });
       setShowCalendar(false);
       setSelectedDates([]);
       setSelectedWeekday(null);
       fetchApplication();
     } catch (err) {
-      alert('Failed to book sessions: ' + (err.response?.data?.message || ''));
+      setAlert({ message: 'Failed to book sessions: ' + (err.response?.data?.message || ''), severity: 'error', show: true });
     }
   };
 
@@ -210,7 +233,8 @@ const handleWeekdaySelect = (weekdayIndex) => {
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!paymentProof) return alert("Please select a file.");
+    if (!paymentProof) 
+      return setAlert({ message: "Please select a file.", severity: 'error', show: true });
 
     const formData = new FormData();
     formData.append('payment_proof', paymentProof);
@@ -219,10 +243,11 @@ const handleWeekdaySelect = (weekdayIndex) => {
       await apiService.post(`/applications/submit-proof/${application.id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      alert('Payment proof submitted. Waiting for admin approval.');
+      setAlert({ message: 'Payment proof submitted successfully. Waiting for admin approval.', severity: 'success', show: true });
       fetchApplication();
     } catch (err) {
-      alert('Failed to submit payment proof.');
+      console.error('Error submitting payment proof:', err);
+      setAlert({ message: 'Failed to submit payment proof: ' + (err.response?.data?.message || ''), severity: 'error', show: true });
     }
   };
 
@@ -324,7 +349,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
       const res = await apiService.get('/users/active-tutors');
       setTutors(res.data);
     } catch {
-      alert('Failed to fetch tutors.');
+      setAlert({ message: 'Failed to fetch tutors.', severity: 'error', show: true });
     }
   };
 
@@ -336,11 +361,11 @@ const handleWeekdaySelect = (weekdayIndex) => {
       const res = await apiService.get(`/bookings/book-timeslots/${tutorId}`);
       setTimeslots(res.data);
       if (res.data.length === 0) {
-        alert('No available timeslots for this tutor. Please select another tutor.');
+        setAlert({ message: 'No available timeslots for this tutor. Please select another tutor.', severity: 'warning', show: true });
       }
     } catch (err) {
       console.error('Error fetching timeslots:', err);
-      alert('Failed to fetch timeslots. Please try again.');
+      setAlert({ message: 'Failed to fetch timeslots. Please try again.', severity: 'error', show: true });
       setTimeslots([]);
     } finally {
       setLoadingTimeslots(false);
@@ -366,7 +391,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
 
   const handleBookingSubmit = async () => {
     if (!selectedTutor || !selectedSlot) {
-      return alert('Please select a tutor and timeslot.');
+      return setAlert({ message: 'Please select a tutor and timeslot.', severity: 'error', show: true });
     }
     try {
       await apiService.post('/bookings/apply', {
@@ -381,9 +406,10 @@ const handleWeekdaySelect = (weekdayIndex) => {
       setTimeslots([]);
       setShowModal(false);
       await fetchApplication();
-      alert('Booking submitted. Please wait for admin approval.');
+      setAlert({ message: 'Booking submitted successfully. Please wait for admin approval.', severity: 'success', show: true });
     } catch (err) {
-      alert('Failed to submit booking. ' + (err.response?.data?.message || ''));
+      console.error('Error submitting booking:', err);
+      setAlert({ message: 'Failed to submit booking. ' + (err.response?.data?.message || ''), severity: 'error', show: true });
     }
   };
 
@@ -415,12 +441,13 @@ const handleWeekdaySelect = (weekdayIndex) => {
   if (!window.confirm('Are you sure you want to cancel this application?')) return;
   try {
     await apiService.post(`/applications/cancel/${application.id}`);
-    alert('Application cancelled.');
+    setAlert({ message: 'Application cancelled successfully.', severity: 'success', show: true });
     setApplication(null);
     setPaymentProof(null);
     await fetchApplication();
   } catch (error) {
-    alert('Failed to cancel application.');
+    console.error('Error cancelling application:', error);
+    setAlert({ message: 'Failed to cancel application: ' + (error.response?.data?.message || ''), severity: 'error', show: true });
   }
 };
   const formatDateLocal = (date) => {
@@ -791,6 +818,21 @@ const handleWeekdaySelect = (weekdayIndex) => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {alert.show && (
+        <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+          fadeOut ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <Alert
+            severity={alert.severity}
+            onClose={() => setAlert({ ...alert, show: false })}
+            variant="filled"
+          >
+            {alert.message}
+          </Alert>
         </div>
       )}
     </>
