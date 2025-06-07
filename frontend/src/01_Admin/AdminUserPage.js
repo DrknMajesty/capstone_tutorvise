@@ -1,5 +1,6 @@
 // AdminUserPage.js
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import ResponsiveNavbar from '../Components/Navbar';
 import UserFormModal from '../Components/UserFormModal_Final';
@@ -14,6 +15,8 @@ const AdminUserPage = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
   const [formData, setFormData] = useState({
     // Common Fields
     username: '', password: '', account_type: '',
@@ -52,7 +55,24 @@ const AdminUserPage = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+    if (alert.show) {
+      // Start fade-out after 3.5s
+      const fadeTimer = setTimeout(() => {
+        setFadeOut(true);
+      }, 3500);
+
+      // Fully hide after fade ends (e.g., 500ms later)
+      const hideTimer = setTimeout(() => {
+        setAlert({ ...alert, show: false });
+        setFadeOut(false); // reset
+      }, 4000);
+
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
 
   const resetForm = () => {
     setFormData({
@@ -80,18 +100,18 @@ const handleSubmit = async (e) => {
         await apiService.put(`/users/update/${formData.id}`, form, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        alert('User updated successfully.');
+        setAlert({ message: 'User updated successfully.', severity: 'success', show: true });
       } else {
         await apiService.post('/users/create', form, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        alert('User created successfully.');
+        setAlert({ message: 'User created successfully.', severity: 'success', show: true });
       }
       resetForm();
       setShowForm(false);
       fetchUsers();
     } catch (err) {
-      alert('Error saving user. Please check input.');
+      setAlert({ message: 'Error saving user. Please check input.', severity: 'error', show: true });
     }
   };
 
@@ -108,7 +128,8 @@ const handleSubmit = async (e) => {
       setSelectedUser({ ...user, extendedProfile });
       setShowViewModal(true);
     } catch {
-      alert('Failed to load user details.');
+      setAlert({ message: 'Failed to load user details.', severity: 'error', show: true });
+      // alert('Failed to load user details.');
     }
   };
 
@@ -156,8 +177,8 @@ const handleEditUser = async (user) => {
       <ResponsiveNavbar />
       <div className="h-24" />
       <div className="items-center justify-center flex flex-col">
-      <div className="p-4 flex flex-col">
-        <h2 className="text-2xl font-bold mb-4">User Management</h2>
+        <div className="p-4 flex flex-col">
+          <h2 className="text-2xl font-bold mb-4">User Management</h2>
 
           <button
             onClick={() => { resetForm(); setIsEdit(false); setShowForm(true); }}
@@ -165,7 +186,6 @@ const handleEditUser = async (user) => {
           >
             Create User Account
           </button>
-
 
           {showForm && (
             <UserFormModal
@@ -283,12 +303,14 @@ const handleEditUser = async (user) => {
                   onClick={async () => {
                     try {
                       await apiService.put(`/users/delete/${selectedUser.id}`);
-                      alert('User deleted successfully.');
+                      setAlert({ message: 'User deleted successfully.', severity: 'success', show: true });
+                      // alert('User deleted successfully.');
                       // Refresh user list after deletion 
                       fetchUsers();
                       setShowDeleteModal(false);
                     } catch (err) {
-                      alert('Failed to delete user. Please try again.');
+                      setAlert({ message: 'Failed to delete user. Please try again.', severity: 'error', show: true });
+                      // alert('Failed to delete user. Please try again.');
                       setShowDeleteModal(false);
                     }
                   }}
@@ -298,6 +320,20 @@ const handleEditUser = async (user) => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+        {alert.show && (
+        <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+          fadeOut ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+            <Alert
+              severity={alert.severity}
+              onClose={() => setAlert({ ...alert, show: false })}
+              variant="filled"
+            >
+              {alert.message}
+            </Alert>
           </div>
         )}
     </>
