@@ -33,7 +33,8 @@ exports.getMyApplication = async (req, res) => {
     const [bookings] = await db.query(`
       SELECT session_date, status
       FROM bookings
-      WHERE application_id = ?;
+      WHERE application_id = ?
+      AND status IN ('pending', 'scheduled', 'accepted');
     `, [application.id]);
 
     // 3. Calculate remaining sessions (total_sessions - booked sessions count)

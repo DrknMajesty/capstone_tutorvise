@@ -26,7 +26,7 @@ const AdminBooking = () => {
 
   const handleAccept = async (bookingId) => {
     try {
-      await apiService.post(`/bookings/accept/${bookingId}`);
+      await apiService.patch(`/bookings/${bookingId}/confirm`);
       alert('Booking accepted.');
       fetchBookings();
     } catch (err) {
@@ -47,7 +47,12 @@ const AdminBooking = () => {
           {loading && <p className="text-center text-gray-600">Loading bookings...</p>}
           {error && <p className="text-center text-red-600">{error}</p>}
           {!loading && !error && (
-            <BookingList bookings={bookings} onAccept={handleAccept} title="Pending Bookings" />
+            <BookingList
+              bookings={bookings}
+              onAccept={handleAccept}
+              title="All Bookings"
+              role="admin" // ← must be exactly this
+            />
           )}
         </div>
       </div>

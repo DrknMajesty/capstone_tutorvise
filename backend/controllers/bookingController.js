@@ -158,7 +158,7 @@ exports.getAllApplicationsWithBookings = async (req, res) => {
 
       WHERE a.application_status = 'Approved'
 
-      ORDER BY a.created_at DESC, b.session_date ASC
+      ORDER BY a.created_at DESC, b.created_at DESC
     `);
 
     res.status(200).json(rows);
@@ -208,7 +208,7 @@ exports.getBookingsForTutor = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-// Tutor accept bookings
+//  Accept bookings
 exports.acceptBooking = async (req, res) => {
   const { bookingId } = req.params;
 
@@ -231,3 +231,64 @@ exports.acceptBooking = async (req, res) => {
   }
 };
 
+exports.getBookingsByStudent = async (req, res) => {
+  const studentId = req.params.studentId;
+
+  try {
+    const [rows] = await db.query(`
+    SELECT 
+      a.id AS application_id,
+      a.student_id,
+      CONCAT(s.fname, ' ', s.lname) AS student_name,
+      a.tutor_id,
+      CONCAT(t.fname, ' ', t.lname) AS tutor_name,
+      a.package_id,
+      p.package_name,
+      a.snapshot_start_time,
+      a.snapshot_end_time,
+      p.total_sessions,
+      a.application_status,
+      a.created_at,
+
+      b.id AS booking_id,
+      b.session_date,
+      b.status AS booking_status
+
+    FROM applications a
+    JOIN users s ON a.student_id = s.id
+    JOIN users t ON a.tutor_id = t.id
+    JOIN packages p ON a.package_id = p.id
+    LEFT JOIN bookings b ON a.id = b.application_id
+
+    WHERE a.student_id = ?
+    ORDER BY a.created_at DESC, b.created_at DESC
+    `, [studentId]);
+
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching student bookings:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.cancelBooking = async (req, res) => {
+    const { bookingId } = req.params;
+
+  try {
+    // Update the booking status to 'accepted'
+    const [result] = await db.query(`
+      UPDATE bookings
+      SET status = 'cancelled'
+      WHERE id = ?
+    `, [bookingId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    res.status(200).json({ message: 'Booking accepted' });
+  } catch (error) {
+    console.error('Error accepting booking:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

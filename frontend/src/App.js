@@ -22,6 +22,7 @@ import AdminBookingManagement from './01_Admin/AdminBooking';
 import StudentProfile from './04_Student/StudentProfile';
 import StudentDashboard from './04_Student/StudentDashboard';
 import StudentBooking from './04_Student/StudentBookingPage';
+import StudentBooking2 from './04_Student/StudentBookingPage2';
 
 // Tutor Routes
 import TutorDashboard from './03_Tutor/TutorDashboard';
@@ -61,6 +62,7 @@ function App() {
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/profile" element={<StudentProfile />} />
         <Route path="/student/bookings" element={<StudentBooking />} />
+        <Route path="/student/booking-list" element={<StudentBooking2/>} />
         </Route>
 
         {/* Tutor Routes */}

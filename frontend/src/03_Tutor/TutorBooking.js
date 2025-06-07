@@ -12,7 +12,7 @@ const TutorBookingPage = () => {
 
   const handleAccept = async (bookingId) => {
     try {
-      await apiService.post(`/bookings/${bookingId}/accept`);
+      await apiService.patch(`/bookings/${bookingId}/confirm`);
       alert('Booking accepted.');
       // Re-fetch bookings after accepting
       if (tutorId) {
