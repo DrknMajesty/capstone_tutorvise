@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import BookingList from '../Components/BookingList';
 import ResponsiveNavbar from '../Components/Navbar';
@@ -8,6 +9,8 @@ const StudentBookingPage2 = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -30,11 +33,11 @@ const StudentBookingPage2 = () => {
 
     try {
       await apiService.patch(`/bookings/${bookingId}/cancel`);
-      alert('Booking cancelled.');
+      setAlert({ message: 'Booking Cancelled.', severity: 'success', show: true });
       fetchBookings();
     } catch (err) {
       console.error('Cancel booking failed:', err);
-      alert('Failed to cancel booking.');
+      setAlert({ message: 'Failed to cancel booking.', severity: 'error', show: true });
     }
   };
 
@@ -61,6 +64,25 @@ const StudentBookingPage2 = () => {
     }
     }, [studentId]);
 
+      useEffect(() => {
+        if (alert.show) {
+          // Start fade-out after 3.5s
+          const fadeTimer = setTimeout(() => {
+            setFadeOut(true);
+          }, 3500);
+      
+            // Fully hide after fade ends (e.g., 500ms later)
+          const hideTimer = setTimeout(() => {
+          setAlert({ ...alert, show: false });
+            setFadeOut(false); // reset
+          }, 4000);
+          
+          return () => {
+            clearTimeout(fadeTimer);
+            clearTimeout(hideTimer);
+          };
+        }
+      }, [alert]);
 
   return (
     <>
@@ -79,6 +101,20 @@ const StudentBookingPage2 = () => {
             />
           )}
         </div>
+              {alert.show && (
+                <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+                  fadeOut ? 'opacity-0' : 'opacity-100'
+                  }`}
+                >
+                  <Alert
+                    severity={alert.severity}
+                    onClose={() => setAlert({ ...alert, show: false })}
+                    variant="filled"
+                  >
+                    {alert.message}
+                  </Alert>
+                </div>
+              )}
       </div>
     </>
   );

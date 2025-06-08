@@ -212,20 +212,66 @@ exports.getBookingsForTutor = async (req, res) => {
 exports.acceptBooking = async (req, res) => {
   const { bookingId } = req.params;
 
+  const connection = await db.getConnection(); // Get a connection from the pool
+
   try {
+    await connection.beginTransaction();
+
+    // Fetch booking details
+    const [bookings] = await connection.query(`
+        SELECT 
+        bookings.*, 
+        applications.snapshot_start_time, 
+        applications.snapshot_end_time
+      FROM bookings
+      JOIN applications ON bookings.application_id = applications.id
+      WHERE bookings.id = ?
+    `, [bookingId]);
+
+    if (bookings.length === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = bookings[0];
+
     // Update the booking status to 'accepted'
-    const [result] = await db.query(`
+    const [updateResult] = await connection.query(`
       UPDATE bookings
       SET status = 'accepted'
       WHERE id = ?
     `, [bookingId]);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: 'Failed to update booking' });
     }
 
-    res.status(200).json({ message: 'Booking accepted' });
+    // Insert into schedule table
+    await connection.query(`
+      INSERT INTO schedules (booking_id, tutor_id, student_id, scheduled_date, start_time, end_time)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [
+      booking.id,
+      booking.tutor_id,
+      booking.student_id,
+      booking.session_date,
+      booking.snapshot_start_time,
+      booking.snapshot_end_time
+    ]);
+
+    await connection.commit();
+    connection.release();
+
+    res.status(200).json({ message: 'Booking accepted and schedule created' });
+
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
     console.error('Error accepting booking:', error);
     res.status(500).json({ message: 'Internal server error' });
   }

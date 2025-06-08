@@ -8,7 +8,7 @@ const path = require('path');
 exports.getAllUsers = async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT * FROM users WHERE account_type IN ('admin staff', 'tutor', 'student') and status = 'active' ORDER BY id DESC"
+      "SELECT * FROM users WHERE status = 'active' ORDER BY id DESC"
     );
     res.json(users);
   } catch (error) {
@@ -56,7 +56,7 @@ exports.changePassword = async (req, res) => {
     // 2. Compare old password
     const isMatch = await bcrypt.compare(oldPassword, hashedPassword);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Incorrect old password.' });
+      return res.status(400).json({ message: 'Incorrect old password.' });
     }
 
     // 3. Hash new password

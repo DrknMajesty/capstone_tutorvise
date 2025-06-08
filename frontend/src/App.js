@@ -29,7 +29,6 @@ import TutorDashboard from './03_Tutor/TutorDashboard';
 import TutorProfile from './03_Tutor/TutorProfile';
 import TutorBooking from './03_Tutor/TutorBooking';
 
-
 function App() {
   return (
     <>
