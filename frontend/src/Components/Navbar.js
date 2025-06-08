@@ -13,6 +13,7 @@ const menuConfig = {
     { label: "Timeslots", path:"/admin/timeslots" },
     { label: "Payments", path:"/admin/payments"},
     { label: "Bookings", path: "/admin/bookings" },
+    { label: "Schedules", path: "/admin/schedules" },
     { label: "Profile", path: "/admin/profile" },
 
   ],

@@ -17,6 +17,7 @@ import AdminPackageManagement from './01_Admin/AdminPackage';
 import AdminTimeslotManagement from './01_Admin/AdminTimeslotPage';
 import AdminPaymentManagement from './01_Admin/AdminPayment';
 import AdminBookingManagement from './01_Admin/AdminBooking';
+import AdminScheduleManagement from './01_Admin/AdminSchedules';
 
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
@@ -52,6 +53,7 @@ function App() {
           <Route path="/admin/timeslots" element={<AdminTimeslotManagement />} />
           <Route path="/admin/payments" element={<AdminPaymentManagement />} />
           <Route path="/admin/bookings" element={<AdminBookingManagement />} />
+          <Route path="/admin/schedules" element={<AdminScheduleManagement />} />
         </Route>
 
         {/* Student Routes */}

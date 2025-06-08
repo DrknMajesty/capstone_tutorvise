@@ -8,6 +8,7 @@ const packageRoutes = require('./routes/packageRoutes');
 const timeslotRoutes = require('./routes/timeslotRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
 const path = require('path');
 const db = require('./db'); // Make sure you have this import
 
@@ -34,16 +35,6 @@ db.getConnection()
     process.exit(1);
   });
 
-// Application Expiration - Run every hour instead of every minute
-// cron.schedule('0 * * * *', async () => {
-//   console.log('⏰ Running scheduled application expiration check...');
-//   try {
-//     const result = await expireOldApplications();
-//     console.log(`✅ Expired ${result.expiredCount} application(s)`);
-//   } catch (err) {
-//     console.error('❌ Error in expiration job:', err);
-//   }
-// });
 
 // Routes
 app.use('/api', authRoutes);
@@ -52,6 +43,7 @@ app.use('/api/packages', packageRoutes);
 app.use('/api/timeslots', timeslotRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
