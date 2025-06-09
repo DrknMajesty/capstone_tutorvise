@@ -67,6 +67,7 @@ const AdminBooking = () => {
       <div className="h-24" /> {/* Spacer Div */}
       <div className="items-center justify-center flex flex-col">
         <div className="max-w-6xl mx-auto mt-10 p-4 w-full">
+          <h2 className="text-2xl font-bold mb-4">Booking Management</h2>
           {loading && <p className="text-center text-gray-600">Loading bookings...</p>}
           {error && <p className="text-center text-red-600">{error}</p>}
           {!loading && !error && (

@@ -17,9 +17,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Admin routes
-router.get('/all-submitted', applicationController.getSubmittedApplications);
-router.put('/approve/:id', applicationController.approveApplication);
-router.put('/reject/:id', applicationController.rejectApplication);
+router.get('/all-submitted', authenticateToken, applicationController.getSubmittedApplications);
+router.put('/approve/:id', authenticateToken, applicationController.approveApplication);
+router.put('/reject/:id', authenticateToken, applicationController.rejectApplication);
 
 // Get current student's application (latest one)
 router.get('/my-applications/:studentId', authenticateToken, applicationController.getMyApplication);
