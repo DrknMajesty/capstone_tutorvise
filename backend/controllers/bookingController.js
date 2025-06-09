@@ -158,7 +158,7 @@ exports.getAllApplicationsWithBookings = async (req, res) => {
 
       WHERE a.application_status = 'Approved'
 
-      ORDER BY a.created_at DESC, b.session_date ASC
+      ORDER BY a.created_at DESC, b.created_at DESC
     `);
 
     res.status(200).json(rows);
@@ -208,15 +208,123 @@ exports.getBookingsForTutor = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-// Tutor accept bookings
+//  Accept bookings
 exports.acceptBooking = async (req, res) => {
   const { bookingId } = req.params;
+
+  const connection = await db.getConnection(); // Get a connection from the pool
+
+  try {
+    await connection.beginTransaction();
+
+    // Fetch booking details
+    const [bookings] = await connection.query(`
+        SELECT 
+        bookings.*, 
+        applications.snapshot_start_time, 
+        applications.snapshot_end_time
+      FROM bookings
+      JOIN applications ON bookings.application_id = applications.id
+      WHERE bookings.id = ?
+    `, [bookingId]);
+
+    if (bookings.length === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = bookings[0];
+
+    // Update the booking status to 'accepted'
+    const [updateResult] = await connection.query(`
+      UPDATE bookings
+      SET status = 'accepted'
+      WHERE id = ?
+    `, [bookingId]);
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: 'Failed to update booking' });
+    }
+
+    // Insert into schedule table
+    await connection.query(`
+      INSERT INTO schedules (booking_id, tutor_id, student_id, scheduled_date, start_time, end_time)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [
+      booking.id,
+      booking.tutor_id,
+      booking.student_id,
+      booking.session_date,
+      booking.snapshot_start_time,
+      booking.snapshot_end_time
+    ]);
+
+    await connection.commit();
+    connection.release();
+
+    res.status(200).json({ message: 'Booking accepted and schedule created' });
+
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
+    console.error('Error accepting booking:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.getBookingsByStudent = async (req, res) => {
+  const studentId = req.params.studentId;
+
+  try {
+    const [rows] = await db.query(`
+    SELECT 
+      a.id AS application_id,
+      a.student_id,
+      CONCAT(s.fname, ' ', s.lname) AS student_name,
+      a.tutor_id,
+      CONCAT(t.fname, ' ', t.lname) AS tutor_name,
+      a.package_id,
+      p.package_name,
+      a.snapshot_start_time,
+      a.snapshot_end_time,
+      p.total_sessions,
+      a.application_status,
+      a.created_at,
+
+      b.id AS booking_id,
+      b.session_date,
+      b.status AS booking_status
+
+    FROM applications a
+    JOIN users s ON a.student_id = s.id
+    JOIN users t ON a.tutor_id = t.id
+    JOIN packages p ON a.package_id = p.id
+    LEFT JOIN bookings b ON a.id = b.application_id
+
+    WHERE a.student_id = ?
+    ORDER BY a.created_at DESC, b.created_at DESC
+    `, [studentId]);
+
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching student bookings:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.cancelBooking = async (req, res) => {
+    const { bookingId } = req.params;
 
   try {
     // Update the booking status to 'accepted'
     const [result] = await db.query(`
       UPDATE bookings
-      SET status = 'accepted'
+      SET status = 'cancelled'
       WHERE id = ?
     `, [bookingId]);
 
@@ -230,4 +338,3 @@ exports.acceptBooking = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-

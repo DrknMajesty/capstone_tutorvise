@@ -19,10 +19,22 @@ router.post('/schedule-sessions', authenticateToken, bookingController.scheduleS
 // Get all All aplications with bookings
 router.get('/all-bookings', authenticateToken, bookingController.getAllApplicationsWithBookings);
 
-// GET bookings for a specific tutor
+// Tutor Routes
+// get bookings of the tutor
 router.get('/tutors/:tutorId/bookings', authenticateToken, bookingController.getBookingsForTutor);
 
-// POST accept a booking
-router.post('/bookings/:bookingId/accept', authenticateToken, bookingController.acceptBooking);
+// // POST accept a booking
+// router.post('/bookings/:bookingId/accept', authenticateToken, bookingController.acceptBooking);
+
+// Student Route
+// get bookings of the student
+router.get('/students/:studentId/bookings', authenticateToken, bookingController.getBookingsByStudent);
+
+// Confirm Booking
+router.put('/:bookingId/confirm', authenticateToken, bookingController.acceptBooking);
+
+// Cancel Booking
+router.put('/:bookingId/cancel', authenticateToken, bookingController.cancelBooking);
+
 
 module.exports = router;

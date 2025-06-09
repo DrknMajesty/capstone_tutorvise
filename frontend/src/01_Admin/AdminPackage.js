@@ -166,11 +166,7 @@ const AdminPackage = () => {
       <div className="items-center justify-center flex flex-col">
         <div className="p-4 flex flex-col">
            <h2 className="text-2xl font-bold mb-4">Package Management</h2>
-          <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-blue-600 text-white text-base w-48 h-12 rounded-md hover:bg-blue-700 mb-4">
-            + Create Package
-          </button>
-
-  
+          
         {loading ? (
           <p>Loading packages...</p>
         ) : error ? (
@@ -179,6 +175,10 @@ const AdminPackage = () => {
           <p>No packages found.</p>
         ) : (
         <>
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-blue-600 text-white text-base w-48 h-12 rounded-md hover:bg-blue-700 mb-4">
+            + Create Package
+          </button>
+
           <div className="overflow-x-auto">
             <table className="table-auto border-collapse border border-gray-300 max-w-4xl w-auto">
               <thead className="bg-gray-100">

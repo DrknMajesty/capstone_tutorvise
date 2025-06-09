@@ -17,17 +17,18 @@ import AdminPackageManagement from './01_Admin/AdminPackage';
 import AdminTimeslotManagement from './01_Admin/AdminTimeslotPage';
 import AdminPaymentManagement from './01_Admin/AdminPayment';
 import AdminBookingManagement from './01_Admin/AdminBooking';
+import AdminScheduleManagement from './01_Admin/AdminSchedules';
 
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
 import StudentDashboard from './04_Student/StudentDashboard';
 import StudentBooking from './04_Student/StudentBookingPage';
+import StudentBooking2 from './04_Student/StudentBookingPage2';
 
 // Tutor Routes
 import TutorDashboard from './03_Tutor/TutorDashboard';
 import TutorProfile from './03_Tutor/TutorProfile';
 import TutorBooking from './03_Tutor/TutorBooking';
-
 
 function App() {
   return (
@@ -52,6 +53,7 @@ function App() {
           <Route path="/admin/timeslots" element={<AdminTimeslotManagement />} />
           <Route path="/admin/payments" element={<AdminPaymentManagement />} />
           <Route path="/admin/bookings" element={<AdminBookingManagement />} />
+          <Route path="/admin/schedules" element={<AdminScheduleManagement />} />
         </Route>
 
         {/* Student Routes */}
@@ -61,6 +63,7 @@ function App() {
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/profile" element={<StudentProfile />} />
         <Route path="/student/bookings" element={<StudentBooking />} />
+        <Route path="/student/booking-list" element={<StudentBooking2/>} />
         </Route>
 
         {/* Tutor Routes */}

@@ -159,7 +159,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
     if (date.getDay() === weekdayIndex && date >= new Date(new Date().setHours(0, 0, 0, 0))) {
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(date);
       newDates.push(dateStr);
     }
   }
@@ -501,10 +501,11 @@ const handleWeekdaySelect = (weekdayIndex) => {
 
                 <div className="flex items-start gap-8">
                   <h3 className="text-lg font-semibold mb-2">Select Dates for Sessions</h3>
-                  <h3 className="text-lg font-semibold mb-2">Legend: </h3>
+                  {/* <h3 className="text-lg font-semibold mb-2">Legend: </h3> */}
 
                   <div className="flex gap-4 mt-2 text-sm">
                   <div className="flex items-center gap-1">
+                    <span><strong>Legend:</strong> </span>
                     <div className="w-4 h-4 bg-blue-500 rounded"></div>
                     <span>Selected</span>
                   </div>
@@ -516,10 +517,10 @@ const handleWeekdaySelect = (weekdayIndex) => {
                     <div className="w-4 h-4 bg-green-100 border border-green-400 rounded"></div>
                     <span>Scheduled</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  {/* <div className="flex items-center gap-1">
                     <div className="w-4 h-4 bg-red-100 border border-red-400 rounded"></div>
                     <span>Cancelled</span>
-                  </div>
+                  </div> */}
                 </div>
                 </div>
                 
@@ -685,7 +686,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
 
       <div className="max-w-6xl mx-auto p-6">
         <div className="items-center justify-center flex flex-col w-full max-w-7xl mx-auto px-4">
-          <h1 className="text-3xl font-bold mb-10 text-center">Book a Tutorial Service</h1>
+          <h1 className="text-3xl font-bold mb-10 text-center">Apply for Tutorial Service</h1>
           
           {shouldShowApplication && renderApplicationDetails()}
 

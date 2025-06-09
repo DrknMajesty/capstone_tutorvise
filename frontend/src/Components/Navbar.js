@@ -11,14 +11,16 @@ const menuConfig = {
     { label: "Users", path: "/admin/users" },
     { label: "Packages", path: "/admin/packages" },
     { label: "Timeslots", path:"/admin/timeslots" },
-    { label: "Applications", path:"/admin/payments"},
+    { label: "Payments", path:"/admin/payments"},
     { label: "Bookings", path: "/admin/bookings" },
+    { label: "Schedules", path: "/admin/schedules" },
     { label: "Profile", path: "/admin/profile" },
 
   ],
   student: [
     { label: "Home", path: "/student/dashboard" },
-    { label: "Bookings", path: "/student/bookings" },
+    { label: "Applications", path: "/student/bookings" },
+    { label: "Bookings", path: "/student/booking-list"},
     { label: "Profile", path: "/student/profile" },
   ],
   tutor: [

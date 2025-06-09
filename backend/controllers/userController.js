@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 
-// Get all users
+// Get all users - admin
 exports.getAllUsers = async (req, res) => {
   try {
     const [users] = await db.query(

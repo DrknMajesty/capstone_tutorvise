@@ -180,6 +180,14 @@ const handleEditUser = async (user) => {
         <div className="p-4 flex flex-col">
           <h2 className="text-2xl font-bold mb-4">User Management</h2>
 
+          {loading ? (
+            <p>Loading users...</p>
+          ) : error ? (
+            <p className="text-red-500">{error}</p>
+          ) : users.length === 0 ? (
+            <p>No users found.</p>
+          ) : (
+          <>
           <button
             onClick={() => { resetForm(); setIsEdit(false); setShowForm(true); }}
             className="bg-blue-600 text-white text-base w-48 h-12 rounded-md hover:bg-blue-700 mb-4"
@@ -204,14 +212,6 @@ const handleEditUser = async (user) => {
             />
           )}
 
-          {loading ? (
-            <p>Loading users...</p>
-          ) : error ? (
-            <p className="text-red-500">{error}</p>
-          ) : users.length === 0 ? (
-            <p>No users found.</p>
-          ) : (
-          <>
             <div className="mb-4">
               <label htmlFor="rowsPerPage" className="mr-2 font-medium">Rows per page:</label>
               <select

@@ -29,8 +29,8 @@ const AdminBooking = () => {
 
   const handleAccept = async (bookingId) => {
     try {
-      await apiService.post(`/bookings/accept/${bookingId}`);
-      setAlert({ message: 'Booking accepted successfully.', severity: 'success', show: true });
+      await apiService.put(`/bookings/${bookingId}/confirm`);
+      setAlert({ message: 'Booking Accepted.', severity: 'success', show: true });
       fetchBookings();
     } catch (err) {
       setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
@@ -67,10 +67,16 @@ const AdminBooking = () => {
       <div className="h-24" /> {/* Spacer Div */}
       <div className="items-center justify-center flex flex-col">
         <div className="max-w-6xl mx-auto mt-10 p-4 w-full">
+          <h2 className="text-2xl font-bold mb-4">Booking Management</h2>
           {loading && <p className="text-center text-gray-600">Loading bookings...</p>}
           {error && <p className="text-center text-red-600">{error}</p>}
           {!loading && !error && (
-            <BookingList bookings={bookings} onAccept={handleAccept} title="Pending Bookings" />
+            <BookingList
+              bookings={bookings}
+              onAccept={handleAccept}
+              title="All Bookings"
+              role="admin" // ← must be exactly this
+            />
           )}
         </div>
       </div>

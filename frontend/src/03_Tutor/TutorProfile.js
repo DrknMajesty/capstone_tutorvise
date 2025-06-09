@@ -15,6 +15,7 @@ const TutorProfile = () => {
     email: '',
     contact_no: '',
     birthdate: '',
+    profile_image_url: '',
   });
   const [profileData, setProfileData] = useState({
     certification: '',
@@ -156,13 +157,17 @@ const TutorProfile = () => {
              <p>Loading...</p>
            ) : (
              <div className="profile-info">
-               {userData.profileImageUrl ? (
-                 <img 
-                   src={userData.profileImageUrl} 
-                   alt="Profile" 
-                   className="profile-image"
-                 />
-               ) : (
+                {userData.profile_image_url ? (
+                  <img 
+                    src={
+                      userData.profile_image_url
+                        ? `http://localhost:5000/uploads/${userData.profile_image_url}`
+                        : '/default-avatar.png'
+                    }
+                    alt="Profile" 
+                    className="profile-image"
+                  />
+                ): (
                  <div className="no-image-placeholder">
                    No Image
                  </div>
