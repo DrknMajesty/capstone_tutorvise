@@ -20,35 +20,34 @@ export default function SchedulePage() {
       const data = res.data;
       console.log("Data:", res.data)
 
-      const formattedEvents = data.map(schedule => {
-        // Parse the scheduled_date as a Date object (UTC)
-        const scheduled = new Date(schedule.scheduled_date);
+const formattedEvents = data.map(schedule => {
+  const scheduled = new Date(schedule.scheduled_date);
 
-        // Extract UTC year, month, day
-        const year = scheduled.getUTCFullYear();
-        const month = scheduled.getUTCMonth();
-        const day = scheduled.getUTCDate();
+  // Extract local year/month/day
+  const year = scheduled.getFullYear();  // local time
+  const month = scheduled.getMonth();    // 0-indexed
+  const day = scheduled.getDate();
 
-        // Parse start/end time strings "HH:mm:ss"
-        const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
-        const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+  // Parse start/end time
+  const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
+  const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
 
-        // Create UTC Date objects for start and end
-        const startUTC = new Date(Date.UTC(year, month, day, startHour, startMinute));
-        const endUTC = new Date(Date.UTC(year, month, day, endHour, endMinute));
+  // Create local Date objects — DO NOT use Date.UTC here
+  const start = new Date(year, month, day, startHour, startMinute);
+  const end = new Date(year, month, day, endHour, endMinute);
 
-        // Convert UTC Date objects to local Date objects
-        const start = new Date(startUTC.getTime() + startUTC.getTimezoneOffset() * 60000 * -1);
-        const end = new Date(endUTC.getTime() + endUTC.getTimezoneOffset() * 60000 * -1);
+  const studentName = `${schedule.student_first_name} ${schedule.student_last_name}`;
+  const tutorName = `${schedule.tutor_first_name} ${schedule.tutor_last_name}`;
 
-        return {
-          ...schedule,
-          title: 'Tutorial Event',
-          start,
-          end,
-          allDay: false
-        };
-      });
+  return {
+    ...schedule,
+    title: `Tutorial: ${studentName} with ${tutorName}`,
+    start,
+    end,
+    allDay: false
+  };
+});
+
 
 
       setEvents(formattedEvents);

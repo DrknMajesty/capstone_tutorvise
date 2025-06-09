@@ -140,7 +140,7 @@ exports.getSubmittedApplications = async (req, res) => {
       JOIN packages p ON a.package_id = p.id
       JOIN users s ON a.student_id = s.id
       JOIN users t ON a.tutor_id = t.id
-      WHERE a.application_status IN ('Pending', 'Approved', 'Cancelled', 'Expired', 'Submitted')
+      WHERE a.application_status IN ('Pending', 'Approved', 'Cancelled', 'Submitted')
       ORDER BY a.created_at DESC
     `;
     const [rows] = await db.query(query);
