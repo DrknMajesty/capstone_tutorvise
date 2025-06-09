@@ -125,7 +125,7 @@ const handleModalSubmit = async (newDate, newStart, newEnd) => {
           ) : error ? (
             <p className="text-red-600">{error}</p>
           ) : events.length === 0 ? (
-            <p>Login Token Expire.</p>
+            <p>No schedules found.</p>
           ) : (
           <>
             <div className="p-6">

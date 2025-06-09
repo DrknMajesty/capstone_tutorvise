@@ -193,12 +193,13 @@ exports.getBookingsForTutor = async (req, res) => {
       b.status AS booking_status
 
     FROM applications a
+
     JOIN users s ON a.student_id = s.id
     JOIN users t ON a.tutor_id = t.id
     JOIN packages p ON a.package_id = p.id
     LEFT JOIN bookings b ON a.id = b.application_id
 
-    WHERE a.tutor_id = ?
+    WHERE a.tutor_id = ? AND a.application_status = 'Approved'
     ORDER BY a.created_at DESC, b.session_date ASC
     `, [tutorId]);
 

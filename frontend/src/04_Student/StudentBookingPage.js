@@ -31,6 +31,13 @@ const StudentBookingPage = () => {
 
   const [bookedDates, setBookedDates] = useState([]);
 
+  const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
+    const totalPrice = parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
+    return parseFloat(totalPrice.toFixed(2));
+  };
+
+  const formatCurrency = (amount) => `₱${amount.toFixed(2)}`;
+
   useEffect(() => {
     if (alert.show) {
       // Start fade-out after 3.5s
@@ -473,13 +480,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
           <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}</p>
           <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
           <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
-          <p>
-            <strong>Date Applied:</strong>{' '}
-            {new Date(application.created_at).toLocaleString('en-US', {
-              dateStyle: 'long',
-              timeStyle: 'short',
-            })}
-          </p>
+          <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
           <p>
             <strong>Remaining Session:</strong>{' '}
             <span className="font-bold text-red-600">
@@ -615,7 +616,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
         <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}</p>
         <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
         <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
-        <p><strong>Date Applied:</strong> {application.created_at}</p>
+        <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
         
         <div className="mt-4">
           {application.application_status === 'pending' ? (
@@ -716,7 +717,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
                   >
                     <div>
                       <h3 className="text-2xl font-bold mb-3 text-blue-700">{pkg.package_name}</h3>
-                      <p className="text-lg mb-1"><strong>Total Price:</strong> ₱{pkg.price_package}</p>
+                      <p className="text-lg mb-1"><strong>Total Price:</strong> {formatCurrency(calculateTotalPrice(pkg.price_package, pkg.total_sessions, pkg.price_sessions))}</p>
                       <p className="text-lg mb-1"><strong>Sessions:</strong> {pkg.total_sessions}</p>
                       <p className="text-lg mb-2 capitalize"><strong>Tutorial Type:</strong> {pkg.tutorial_type}</p>
                       <p className="text-sm text-gray-600">{pkg.description}</p>

@@ -151,7 +151,6 @@ exports.getSubmittedApplications = async (req, res) => {
   }
 };
 
-// Approve application and set expired_at (30 days from now)
 exports.approveApplication = async (req, res) => {
   const connection = await db.getConnection();
   try {
@@ -159,7 +158,7 @@ exports.approveApplication = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Step 1: Update the application
+    // Step 1: Update the application status and expiry
     const updateAppQuery = `
       UPDATE applications
       SET application_status = 'Approved',
@@ -168,19 +167,36 @@ exports.approveApplication = async (req, res) => {
     `;
     await connection.query(updateAppQuery, [id]);
 
-    // Step 2: Get timeslot_id associated with the application
-    const [rows] = await connection.query(
-      `SELECT timeslot_id FROM applications WHERE id = ?`,
+    // Step 2: Get timeslot_id and package_id from the application
+    const [appRows] = await connection.query(
+      `SELECT timeslot_id, package_id FROM applications WHERE id = ?`,
       [id]
     );
 
-    if (rows.length === 0 || !rows[0].timeslot_id) {
+    if (appRows.length === 0 || !appRows[0].timeslot_id) {
       throw new Error('Timeslot not found for the application.');
     }
 
-    const timeslotId = rows[0].timeslot_id;
+    const timeslotId = appRows[0].timeslot_id;
+    const packageId = appRows[0].package_id;
 
-    // Step 3: Update the timeslot status
+    // Step 3: Get package details to calculate total price
+    const [packageRows] = await connection.query(
+      `SELECT price_package, total_sessions, price_sessions FROM packages WHERE id = ?`,
+      [packageId]
+    );
+
+    if (packageRows.length === 0) {
+      throw new Error('Package not found.');
+    }
+
+    const pricePackage = parseFloat(packageRows[0].price_package);
+    const totalSessions = parseInt(packageRows[0].total_sessions);
+    const pricePerSession = parseFloat(packageRows[0].price_sessions);
+
+    const amountPaid = Number((pricePackage + totalSessions * pricePerSession).toFixed(2));
+
+    // Step 4: Update the timeslot status to 'booked'
     const updateTimeslotQuery = `
       UPDATE timeslots
       SET status = 'booked'
@@ -188,8 +204,15 @@ exports.approveApplication = async (req, res) => {
     `;
     await connection.query(updateTimeslotQuery, [timeslotId]);
 
+    // Step 5: Insert payment record with calculated total price
+    const insertPaymentQuery = `
+      INSERT INTO payments (application_id, amount_paid, payment_date)
+      VALUES (?, ?, NOW())
+    `;
+    await connection.query(insertPaymentQuery, [id, amountPaid]);
+
     await connection.commit();
-    res.status(200).json({ message: 'Application approved and timeslot booked.' });
+    res.status(200).json({ message: 'Application approved, timeslot booked, and payment recorded.' });
   } catch (err) {
     if (connection) await connection.rollback();
     console.error('Error approving application:', err);
@@ -198,6 +221,7 @@ exports.approveApplication = async (req, res) => {
     if (connection) connection.release();
   }
 };
+
 
 // Reject application
 exports.rejectApplication = async (req, res) => {

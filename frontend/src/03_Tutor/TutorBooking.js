@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import BookingList from '../Components/BookingList';
@@ -13,69 +13,56 @@ const TutorBookingPage = () => {
 
   const tutorId = sessionStorage.getItem('user_id');
 
-  const handleAccept = async (bookingId) => {
-    try {
-      await apiService.post(`/bookings/${bookingId}/accept`);
-      alert('Booking accepted.');
-      // Re-fetch bookings after accepting
-      if (tutorId) {
-        const res = await apiService.get(`/bookings/tutors/${tutorId}/bookings`);
-        setBookings(res.data || []);
-      }
-    } catch (err) {
-      console.error('Error accepting booking:', err);
-      setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
-    }
-  };
+// 1. --- Data Fetching Handler ---
+const fetchBookings = useCallback(async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    const res = await apiService.get(`/bookings/tutors/${tutorId}/bookings`);
+    const bookingsData = res.data || [];
+    console.log('Data received from API:', res.data);
+    setBookings(bookingsData);
+    console.log('Fetched tutor bookings:', bookingsData);
+  } catch (err) {
+    console.error('Error fetching tutor bookings:', err);
+    setError('Failed to fetch tutor bookings.');
+  } finally {
+    setLoading(false);
+    console.log('Fetching bookings finished');
+  }
+}, [tutorId]);
 
-  useEffect(() => {
-    console.log('useEffect triggered, tutorId:', tutorId);
+// 2. --- Booking Action Handler ---
+const handleAccept = async (bookingId) => {
+  try {
+    await apiService.put(`/bookings/${bookingId}/confirm`);
+    setAlert({ message: 'Booking accepted', severity: 'success', show: true });
+    fetchBookings(); // Refresh the list after action
+  } catch (err) {
+    console.error('Error accepting booking:', err);
+    setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
+  }
+};
 
-    const fetchBookings = async () => {
-      console.log('Fetching bookings...');
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await apiService.get(`/bookings/tutors/${tutorId}/bookings`);
-        const bookingsData = res.data || [];
-        console.log('Data received from API:', res.data);
-        setBookings(bookingsData);
-        console.log('Fetched tutor bookings:', bookingsData);
-      } catch (err) {
-        console.error('Error fetching tutor bookings:', err);
-        setError('Failed to fetch tutor bookings.');
-      } finally {
-        setLoading(false);
-        console.log('Fetching bookings finished');
-      }
-    };
+// 3. --- Side Effects ---
+useEffect(() => {
+  fetchBookings(); // On mount or tutorId change
+}, [fetchBookings]);
 
-    if (tutorId) {
-      fetchBookings();
-    } else {
-      console.log('No tutorId provided, skipping fetch');
-    }
-  }, [tutorId]);
-
-  useEffect(() => {
-    if (alert.show) {
-      // Start fade-out after 3.5s
-      const fadeTimer = setTimeout(() => {
-        setFadeOut(true);
-      }, 3500);
-  
-        // Fully hide after fade ends (e.g., 500ms later)
-      const hideTimer = setTimeout(() => {
+useEffect(() => {
+  if (alert.show) {
+    const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+    const hideTimer = setTimeout(() => {
       setAlert({ ...alert, show: false });
-        setFadeOut(false); // reset
-      }, 4000);
-      
-      return () => {
-        clearTimeout(fadeTimer);
-        clearTimeout(hideTimer);
-      };
-    }
-  }, [alert]);
+      setFadeOut(false);
+    }, 4000);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }
+}, [alert]);
 
   return (
     <>
@@ -86,7 +73,10 @@ const TutorBookingPage = () => {
           {loading && <p className="text-center text-gray-600">Loading bookings...</p>}
           {error && <p className="text-center text-red-600">{error}</p>}
           {!loading && !error && (
-            <BookingList bookings={bookings} onAccept={handleAccept} title="Student Bookings" />
+            <BookingList 
+              bookings={bookings} 
+              onAccept={handleAccept} 
+              title="Student Bookings" />
           )}
         </div>
       </div>
