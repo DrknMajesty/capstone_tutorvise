@@ -14,18 +14,20 @@ const menuConfig = {
     { label: "Payments", path:"/admin/payments"},
     { label: "Bookings", path: "/admin/bookings" },
     { label: "Schedules", path: "/admin/schedules" },
+    { label: "Sessions", path: "/admin/sessions" },
     { label: "Profile", path: "/admin/profile" },
-
   ],
   student: [
     { label: "Home", path: "/student/dashboard" },
     { label: "Applications", path: "/student/bookings" },
     { label: "Bookings", path: "/student/booking-list"},
+    { label: "Sessions", path: "/student/sessions"},
     { label: "Profile", path: "/student/profile" },
   ],
   tutor: [
     { label: "Home", path: "/tutor/dashboard" },
     { label: "Bookings", path: "/tutor/bookings" },
+    { label: "Sessions", path: "/tutor/sessions" },
     { label: "Profile", path: "/tutor/profile" },
   ]
 };

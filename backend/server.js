@@ -9,6 +9,7 @@ const timeslotRoutes = require('./routes/timeslotRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
 const path = require('path');
 const db = require('./db'); // Make sure you have this import
 
@@ -44,6 +45,7 @@ app.use('/api/timeslots', timeslotRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/sessions', sessionRoutes);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

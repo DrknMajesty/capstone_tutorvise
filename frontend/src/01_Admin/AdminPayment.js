@@ -75,7 +75,7 @@ const AdminApplicationManagementPage = () => {
   <div className="h-24" />
   <div className="items-center justify-center flex flex-col">
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Package Applications</h1>
+      <h1 className="text-3xl font-bold mb-6">Student Applications</h1>
 
       {loading ? (
         <p>Loading applications...</p>

@@ -18,6 +18,7 @@ import AdminTimeslotManagement from './01_Admin/AdminTimeslotPage';
 import AdminPaymentManagement from './01_Admin/AdminPayment';
 import AdminBookingManagement from './01_Admin/AdminBooking';
 import AdminScheduleManagement from './01_Admin/AdminSchedules';
+import AdminSessionManagement from './01_Admin/AdminSessions';
 
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
@@ -29,6 +30,8 @@ import StudentBooking2 from './04_Student/StudentBookingPage2';
 import TutorDashboard from './03_Tutor/TutorDashboard';
 import TutorProfile from './03_Tutor/TutorProfile';
 import TutorBooking from './03_Tutor/TutorBooking';
+import TutorSessions from './03_Tutor/TutorSessions';
+import StudentSessionsPage from './04_Student/StudentSessions';
 
 function App() {
   return (
@@ -54,6 +57,7 @@ function App() {
           <Route path="/admin/payments" element={<AdminPaymentManagement />} />
           <Route path="/admin/bookings" element={<AdminBookingManagement />} />
           <Route path="/admin/schedules" element={<AdminScheduleManagement />} />
+          <Route path="/admin/sessions" element={<AdminSessionManagement />} />
         </Route>
 
         {/* Student Routes */}
@@ -63,7 +67,8 @@ function App() {
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/profile" element={<StudentProfile />} />
         <Route path="/student/bookings" element={<StudentBooking />} />
-        <Route path="/student/booking-list" element={<StudentBooking2/>} />
+        <Route path="/student/booking-list" element={<StudentBooking2 />} />
+        <Route path="/student/sessions" element={<StudentSessionsPage />} />
         </Route>
 
         {/* Tutor Routes */}
@@ -71,8 +76,9 @@ function App() {
           element={<ProtectedRoute allowed_type="tutor" />}
         >
         <Route path="/tutor/dashboard" element={<TutorDashboard />} />    
-        <Route path="/tutor/profile" element={<TutorProfile />} />
         <Route path="/tutor/bookings" element={<TutorBooking /> } />
+        <Route path="/tutor/sessions" element={<TutorSessions />} />
+        <Route path="/tutor/profile" element={<TutorProfile />} />
         </Route>
         
         {/* Add other routes here */}

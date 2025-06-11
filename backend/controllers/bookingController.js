@@ -221,12 +221,12 @@ exports.acceptBooking = async (req, res) => {
     // Fetch booking details
     const [bookings] = await connection.query(`
         SELECT 
-        bookings.*, 
-        applications.snapshot_start_time, 
-        applications.snapshot_end_time
-      FROM bookings
-      JOIN applications ON bookings.application_id = applications.id
-      WHERE bookings.id = ?
+          bookings.*, 
+          applications.snapshot_start_time, 
+          applications.snapshot_end_time
+        FROM bookings
+        JOIN applications ON bookings.application_id = applications.id
+        WHERE bookings.id = ?
     `, [bookingId]);
 
     if (bookings.length === 0) {
@@ -250,8 +250,8 @@ exports.acceptBooking = async (req, res) => {
       return res.status(404).json({ error: 'Failed to update booking' });
     }
 
-    // Insert into schedule table
-    await connection.query(`
+    // Insert into schedules table
+    const [scheduleResult] = await connection.query(`
       INSERT INTO schedules (booking_id, tutor_id, student_id, scheduled_date, start_time, end_time)
       VALUES (?, ?, ?, ?, ?, ?)
     `, [
@@ -263,10 +263,18 @@ exports.acceptBooking = async (req, res) => {
       booking.snapshot_end_time
     ]);
 
+    const scheduleId = scheduleResult.insertId;
+
+    // Insert into sessions table
+    await connection.query(`
+      INSERT INTO sessions (schedule_id, status)
+      VALUES (?, 'upcoming')
+    `, [scheduleId]);
+
     await connection.commit();
     connection.release();
 
-    res.status(200).json({ message: 'Booking accepted and schedule created' });
+    res.status(200).json({ message: 'Booking accepted, schedule and session created' });
 
   } catch (error) {
     if (connection) {
@@ -307,7 +315,7 @@ exports.getBookingsByStudent = async (req, res) => {
     JOIN packages p ON a.package_id = p.id
     LEFT JOIN bookings b ON a.id = b.application_id
 
-    WHERE a.student_id = ?
+    WHERE a.student_id = ? AND application_status = 'approved'
     ORDER BY a.created_at DESC, b.created_at DESC
     `, [studentId]);
 
