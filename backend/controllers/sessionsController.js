@@ -87,3 +87,50 @@ exports.getSessionLogs = async (req, res) => {
   }
 };
 
+exports.getSessionsByTutor = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        s.id AS session_id,
+        s.status,
+        s.confirmed_at,
+        sc.scheduled_date,
+        sc.start_time,
+        sc.end_time,
+        student.lname AS student_name,
+        tutor.lname AS tutor_name
+      FROM sessions s
+      JOIN schedules sc ON s.schedule_id = sc.id
+      JOIN users AS student ON sc.student_id = student.id
+      JOIN users AS tutor ON sc.tutor_id = tutor.id
+      WHERE tutor.id = ?
+      ORDER BY sc.scheduled_date, sc.start_time
+      `,
+      [id]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching tutor sessions:', err);
+    res.status(500).json({ error: 'Failed to fetch tutor sessions' });
+  }
+};
+
+exports.updateSessionStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE sessions SET status = ?, updated_at = NOW() WHERE id = ?',
+      [status, id]
+    );
+    res.json({ message: 'Session status updated' });
+  } catch (err) {
+    console.error('Error updating session status:', err);
+    res.status(500).json({ error: 'Failed to update session status' });
+  }
+};

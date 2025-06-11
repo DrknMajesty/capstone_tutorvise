@@ -8,13 +8,14 @@ const authenticateToken = require('../middleware/auth');
 // Fetch all sessions
 router.get('/', authenticateToken, sessionController.getAllSessions);
 
-// // Fetch sessions by specific date
-// router.get('/date/:date', authenticateToken, sessionController.getSessionsByDate);
-
 // Update session status
 router.put('/:id/status', authenticateToken, sessionController.updateSessionStatus);
 
 // Get session status update logs (optional)
 router.get('/logs', authenticateToken, sessionController.getSessionLogs);
+
+// Tutor Routes
+router.get('/tutor/:id', authenticateToken, sessionController.getSessionsByTutor);
+router.put('/:id/status', authenticateToken, sessionController.updateSessionStatus);
 
 module.exports = router;

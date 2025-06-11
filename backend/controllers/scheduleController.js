@@ -3,21 +3,34 @@ const db = require('../db'); // your MySQL2 connection
 exports.getAllSchedules = async (req, res) => {
   try {
     const [rows] = await db.query(`
-    SELECT 
-      schedules.id,
-      schedules.scheduled_date,
-      schedules.start_time,
-      schedules.end_time,
-      schedules.student_id,
-      schedules.tutor_id,
-      student.fname AS student_first_name,
-      student.lname AS student_last_name,
-      tutor.fname AS tutor_first_name,
-      tutor.lname AS tutor_last_name
-    FROM schedules
-    JOIN users AS student ON schedules.student_id = student.id
-    JOIN users AS tutor ON schedules.tutor_id = tutor.id
-    ORDER BY schedules.scheduled_date, schedules.start_time;
+SELECT 
+  schedules.id,
+  schedules.scheduled_date,
+  schedules.start_time,
+  schedules.end_time,
+  schedules.student_id,
+  schedules.tutor_id,
+
+  student.fname AS student_first_name,
+  student.lname AS student_last_name,
+  tutor.fname AS tutor_first_name,  
+  tutor.lname AS tutor_last_name,
+
+  packages.package_name AS package_name,
+  packages.tutorial_type AS type
+
+FROM schedules
+
+-- Join student and tutor
+JOIN users AS student ON schedules.student_id = student.id
+JOIN users AS tutor ON schedules.tutor_id = tutor.id
+
+-- Follow the booking → application → package path
+JOIN bookings ON schedules.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN packages ON applications.package_id = packages.id
+
+ORDER BY schedules.scheduled_date, schedules.start_time;
     `);
 
     res.status(200).json(rows);
