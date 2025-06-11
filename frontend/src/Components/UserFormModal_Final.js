@@ -6,6 +6,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
   const [previewImage, setPreviewImage] = useState(null);
   const [passwordError, setPasswordError] = useState("");
   const fileInputRef = useRef(null);
+  const [isChangePassword, setIsChangePassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, type, value, files } = e.target;
@@ -71,16 +72,25 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
         className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <form onSubmit={handleSubmit} encType="multipart/form-data">
-          <h3 className="text-lg font-semibold mb-4">
+         <h3 className="text-lg font-semibold mb-4">
             {isEdit ? "Edit User Details" : "New User Details"}
           </h3>
 
           {isEdit && (
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              User ID: {formData.id}
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                User ID: {formData.id}
+              </label>
+              <div className="block items-center gap-4 mb-4">
+                <button
+                  onClick={() => setIsChangePassword((prev) => !prev)}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+                >{isChangePassword ? "Cancel Change Password" : "Change Password"}</button>
+              </div>
+            </div>
           )}
+        <form onSubmit={handleSubmit} encType="multipart/form-data">
+         
 
           {/* Profile Image */}
           <div className="flex items-center gap-4 mb-4">
@@ -105,63 +115,26 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
             <FloatingField
               name="username"
               type="text"
-              label="Username"
+              label={
+                <span>
+                  Username <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.username ?? ""}
               onChange={handleChange}
               required
             />
             
-            {/* Password Fields */}
-            {!isEdit ? (
-              <>
-                <FloatingField
-                  name="password"
-                  type="password"
-                  label="Password"
-                  value={formData.password ?? ""}
-                  onChange={handleChange}
-                  required
-                />
-                <FloatingField
-                  name="confirmPassword"
-                  type="password"
-                  label="Confirm Password"
-                  value={formData.confirmPassword ?? ""}
-                  onChange={handleChange}
-                  required
-                />
-              </>
-            ) : (
-              <>
-                <FloatingField
-                  name="password"
-                  type="password"
-                  label="New Password"
-                  value={formData.password ?? ""}
-                  onChange={handleChange}
-                  placeholder="Leave blank to keep current password"
-                />
-                <FloatingField
-                  name="confirmPassword"
-                  type="password"
-                  label="Confirm New Password"
-                  value={formData.confirmPassword ?? ""}
-                  onChange={handleChange}
-                  placeholder="Leave blank to keep current password"
-                />
-              </>
-            )}
-
-            {passwordError && (
-              <div className="col-span-2 text-red-600 text-sm">
-                {passwordError}
-              </div>
-            )}
+            
 
             <FloatingField
               type="select"
               name="account_type"
-              label="Account Type"
+              label={
+                <span>
+                  Account Type <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.account_type || ""}
               onChange={handleChange}
               required
@@ -194,7 +167,11 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
             <FloatingField
               name="birthdate"
               type="date"
-              label="Birthdate"
+              label={
+                <span>
+                  Birthdate <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.birthdate || ""}
               onChange={handleChange}
               required
@@ -202,7 +179,11 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
             <FloatingField
               name="fname"
               type="text"
-              label="First Name"
+              label={
+                <span>
+                  First Name <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.fname || ""}
               onChange={handleChange}
               required
@@ -210,19 +191,68 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
             <FloatingField
               name="mname"
               type="text"
-              label="Middle Name"
+              label={
+                <span>
+                  Middle Name <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.mname || ""}
               onChange={handleChange}
             />
             <FloatingField
               name="lname"
               type="text"
-              label="Last Name"
+              label={
+                <span>
+                  Last Name <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.lname || ""}
               onChange={handleChange}
               required
             />
           </div>
+
+          {/* Password Fields */}
+          {(!isEdit || (isEdit && isChangePassword)) && (
+            <div className="grid grid-cols-2 gap-2 mb-2">
+            <h4 className="col-span-2 text-md font-semibold">
+              {isEdit ? "Change Password" : "Enter Password"}
+            </h4>
+              <FloatingField
+                name="password"
+                type="password"
+                label={
+                  <span>
+                    {isEdit ? "New Password" : "Password"} <span className="text-red-500">*</span>
+                  </span>
+                }
+                value={formData.password ?? ""}
+                onChange={handleChange}
+                placeholder={isEdit ? "Leave blank to keep current password" : ""}
+                required={!isEdit}
+              />
+              <FloatingField
+                name="confirmPassword"
+                type="password"
+                label={
+                  <span>
+                    {isEdit ? "Confirm New Password" : "Confirm Password"} <span className="text-red-500">*</span>
+                  </span>
+                }
+                value={formData.confirmPassword ?? ""}
+                onChange={handleChange}
+                placeholder={isEdit ? "Leave blank to keep current password" : ""}
+                required={!isEdit}
+              />
+            </div>
+          )}
+
+          {passwordError && (
+            <div className="col-span-2 text-red-600 text-sm">
+              {passwordError}
+            </div>
+          )}
 
           {/* Student Fields */}
           {formData.account_type === "student" && (
@@ -233,23 +263,38 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               <FloatingField
                 name="parent_fname"
                 type="text"
-                label="First Name"
+                label={
+                  <span>
+                    First Name <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.parent_fname || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="parent_mname"
                 type="text"
-                label="Middle Name"
+                label={
+                  <span>
+                    Middle Name <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.parent_mname || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="parent_lname"
                 type="text"
-                label="Last Name"
+                label={
+                  <span>
+                    Last Name <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.parent_lname || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="parent_suffix"
@@ -261,19 +306,29 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               <FloatingField
                 name="parent_email"
                 type="email"
-                label="Email"
+                label={
+                  <span>
+                    Email <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.parent_email || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="parent_contact_no"
                 type="text"
-                label="Parent Contact No."
+                label={
+                  <span>
+                    Parent Contact No. <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.parent_contact_no || ""}
                 onChange={(e) => {
                   const input = e.target.value;
                   if (/^\d{0,11}$/.test(input)) handleChange(e);
                 }}
+                required
               />
             </div>
           )}
@@ -286,44 +341,74 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               <FloatingField
                 name="certification"
                 type="text"
-                label="Certification"
+                label={
+                  <span>
+                    Certification <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.certification || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="teaching_lvl"
                 type="text"
-                label="Teaching Level"
+                label={
+                  <span>
+                    Teaching Level <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.teaching_lvl || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="subject"
                 type="text"
-                label="Subject"
+                label={
+                  <span>
+                    Subject <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.subject || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="credentials"
                 type="text"
-                label="Credentials"
+                label={
+                  <span>
+                    Credentials <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.credentials || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="graduate_at"
                 type="text"
-                label="Graduate At"
+                label={
+                  <span>
+                    Graduate At <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.graduate_at || ""}
                 onChange={handleChange}
+                required
               />
               <FloatingField
                 name="major"
                 type="text"
-                label="Major"
+                label={
+                  <span>
+                    Major <span className="text-red-500">*</span>
+                  </span>
+                }
                 value={formData.major || ""}
                 onChange={handleChange}
+                required
               />
             </div>
           )}
