@@ -22,6 +22,7 @@ const menuConfig = {
     { label: "Applications", path: "/student/bookings" },
     { label: "Bookings", path: "/student/booking-list" },
     { label: "Sessions", path: "/student/sessions" },
+    { label: "Payments", path: "/student/payments" },
     { label: "Profile", path: "/student/profile", icon: <CircleUser size={18} /> },
   ],
   tutor: [

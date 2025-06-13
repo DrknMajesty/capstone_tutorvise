@@ -36,5 +36,8 @@ router.post('/expire-applications', applicationController.expireApplicationsBulk
 // Manual/specific expiration
 router.post('/expire/:id', applicationController.expireSingleApplication);
 
+//Student Fetch Application
+router.get('/:studentId/my-applications', authenticateToken, applicationController.getMyApplications);
+
 module.exports = router;
 
