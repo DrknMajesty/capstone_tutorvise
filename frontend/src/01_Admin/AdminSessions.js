@@ -1,4 +1,4 @@
-// AdminSessionsPage with status update buttons and confirmation modal
+// AdminSessionsPage with filters, toggle view and pagination
 import React, { useEffect, useState } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
@@ -10,6 +10,13 @@ const AdminSessionsPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [sessionLogs, setSessionLogs] = useState([]);
   const [modalInfo, setModalInfo] = useState({ open: false, sessionId: null, status: '' });
+
+  const [viewMode, setViewMode] = useState('byDate');
+  const [currentPage, setCurrentPage] = useState(1);
+  const sessionsPerPage = 5;
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   useEffect(() => {
     fetchSessions();
@@ -46,10 +53,6 @@ const AdminSessionsPage = () => {
     }
   };
 
-  const handleDateChange = (e) => {
-    setSelectedDate(e.target.value);
-  };
-
   const confirmStatusUpdate = async () => {
     const { sessionId, status } = modalInfo;
     try {
@@ -67,80 +70,154 @@ const AdminSessionsPage = () => {
     }
   };
 
+  const indexOfLast = currentPage * sessionsPerPage;
+  const indexOfFirst = indexOfLast - sessionsPerPage;
+  const paginatedSessions = sessions.filter(session => {    
+  const matchStatus = filterStatus ? session.status === filterStatus : true;
+  const matchQuery = session.tutor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    session.student_name.toLowerCase().includes(searchQuery.toLowerCase());
+  return matchQuery && matchStatus;
+  });
+  const currentSessions = paginatedSessions.slice(indexOfFirst, indexOfLast);
+  const totalPages = Math.ceil(paginatedSessions.length / sessionsPerPage);
+
+  const SessionTable = ({ data }) => (
+    <div className="overflow-x-auto mb-10">
+      <table className="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border px-4 py-2 text-left">Student</th>
+            <th className="border px-4 py-2 text-left">Tutor</th>
+            <th className="border px-4 py-2 text-left">Date</th>
+            <th className="border px-4 py-2 text-left">Time</th>
+            <th className="border px-4 py-2 text-left">Status</th>
+            <th className="border px-4 py-2 text-left">Update Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((session) => (
+            <tr key={session.session_id} className="hover:bg-gray-50">
+              <td className="border px-4 py-2">{session.student_name}</td>
+              <td className="border px-4 py-2">{session.tutor_name}</td>
+              <td className="border px-4 py-2">{new Date(session.scheduled_date).toLocaleDateString()}</td>
+              <td className="border px-4 py-2">
+                {new Date(`1970-01-01T${session.start_time}`).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit', hour12: true,
+                })}
+              </td>
+              <td className="border px-4 py-2 capitalize">{session.status}</td>
+              <td className="border px-4 py-2">
+                {session.status === 'completed' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setModalInfo({ open: true, sessionId: session.session_id, status: 'confirmed' })}
+                      className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setModalInfo({ open: true, sessionId: session.session_id, status: 'missed' })}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                    >
+                      Missed
+                    </button>
+                  </div>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div>
       <ResponsiveNavbar username={username} />
       <div className="h-24" />
-
       <div className="items-center justify-center flex flex-col">
         <div className="max-w-5xl w-full mx-auto p-6">
           <h1 className="text-2xl font-bold mb-6">Manage Sessions</h1>
 
-          <div className="mb-6">
-            <label className="block font-medium mb-2">Select Date:</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={handleDateChange}
-              className="border border-gray-300 rounded-md px-3 py-1"
-            />
+          <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <label className="block font-medium mb-1">View Mode:</label>
+              <select
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-1"
+              >
+                <option value="byDate">Sessions by Date</option>
+                <option value="all">All Sessions</option>
+              </select>
+            </div>
+            {viewMode === 'byDate' && (
+              <div>
+                <label className="block font-medium mb-1">Select Date:</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1"
+                />
+              </div>
+            )}
           </div>
 
-          {filteredSessions.length === 0 ? (
-            <p className="text-gray-500 mb-8">No current sessions on selected date.</p>
-          ) : (
-            <div className="overflow-x-auto mb-10">
-              <table className="min-w-full table-auto border-collapse border border-gray-300 text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border px-4 py-2 text-left">Student</th>
-                    <th className="border px-4 py-2 text-left">Tutor</th>
-                    <th className="border px-4 py-2 text-left">Date</th>
-                    <th className="border px-4 py-2 text-left">Time</th>
-                    <th className="border px-4 py-2 text-left">Status</th>
-                    <th className="border px-4 py-2 text-left">Update Session Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSessions.map((session) => (
-                    <tr key={session.session_id} className="hover:bg-gray-50">
-                      <td className="border px-4 py-2">{session.student_name}</td>
-                      <td className="border px-4 py-2">{session.tutor_name}</td>
-                      <td className="border px-4 py-2">{new Date(session.scheduled_date).toLocaleDateString()}</td>
-                      <td className="border px-4 py-2">
-                        {new Date(`1970-01-01T${session.start_time}`).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true,
-                        })}
-                      </td>
-                      <td className="border px-4 py-2 capitalize">{session.status}</td>
-                      <td className="border px-4 py-2">
-                        {session.status === 'completed' && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setModalInfo({ open: true, sessionId: session.session_id, status: 'confirmed' })}
-                              className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => setModalInfo({ open: true, sessionId: session.session_id, status: 'missed' })}
-                              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                            >
-                              Missed
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {viewMode === 'all' && (
+            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input
+                type="text"
+                placeholder="Search by Tutor or Student"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="border border-gray-300 px-3 py-1 rounded-md"
+              />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="border border-gray-300 px-3 py-1 rounded-md"
+              >
+                <option value="">All Statuses</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="missed">Missed</option>
+              </select>
             </div>
           )}
 
-          <div>
+          {viewMode === 'byDate' ? (
+            filteredSessions.length === 0 ? (
+              <p className="text-gray-500 mb-8">No sessions on selected date.</p>
+            ) : (
+              <SessionTable data={filteredSessions} />
+            )
+          ) : (
+            <>
+              <SessionTable data={currentSessions} />
+              <div className="flex justify-center items-center mt-4 space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+
+          <div className="mt-10">
             <h2 className="text-xl font-semibold mb-4">Session Logs</h2>
             {sessionLogs.length === 0 ? (
               <p className="text-gray-500">No recent updates.</p>
@@ -159,7 +236,7 @@ const AdminSessionsPage = () => {
                   </thead>
                   <tbody>
                     {sessionLogs
-                      .filter((log) => log.status === 'confirmed' || log.status === 'missed')
+                      .filter(log => log.status === 'confirmed' || log.status === 'missed')
                       .map((log, index) => (
                         <tr key={index} className="border-t border-gray-200">
                           <td className="p-2">{log.student_name}</td>
@@ -167,9 +244,7 @@ const AdminSessionsPage = () => {
                           <td className="p-2">{new Date(log.scheduled_date).toLocaleDateString()}</td>
                           <td className="p-2">
                             {new Date(`1970-01-01T${log.start_time}`).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: true,
+                              hour: '2-digit', minute: '2-digit', hour12: true,
                             })}
                           </td>
                           <td className="p-2 capitalize">{log.status}</td>
@@ -184,7 +259,6 @@ const AdminSessionsPage = () => {
         </div>
       </div>
 
-      {/* Confirmation Modal */}
       {modalInfo.open && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded shadow-md w-80">
