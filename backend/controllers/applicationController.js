@@ -294,32 +294,32 @@ exports.getMyApplications = async (req, res) => {
   const studentId = req.user.id;
   try {
     const [apps] = await db.query(`
-SELECT 
-  a.id,
-  a.tutor_id,
-  a.package_id,
-  a.application_status AS status,
-  a.submitted_at,
-  a.created_at,
-  p.package_name, 
-  p.price_package, 
-  p.total_sessions, 
-  p.price_sessions,
-  t.fname AS tutor_fname, 
-  t.lname AS tutor_lname,
-  pay.id AS payment_id,
-  pay.amount_paid AS paid_amount,
-  pay.payment_date
+  SELECT 
+    a.id,
+    a.tutor_id,
+    a.package_id,
+    a.application_status AS status,
+    a.submitted_at,
+    a.created_at,
+    p.package_name, 
+    p.price_package, 
+    p.total_sessions, 
+    p.price_sessions,
+    t.fname AS tutor_fname, 
+    t.lname AS tutor_lname,
+    pay.id AS payment_id,
+    pay.amount_paid AS paid_amount,
+    pay.payment_date
 
-FROM applications a
-JOIN packages p ON a.package_id = p.id
-JOIN users t ON a.tutor_id = t.id
-LEFT JOIN payments pay ON pay.application_id = a.id
+  FROM applications a
+  JOIN packages p ON a.package_id = p.id
+  JOIN users t ON a.tutor_id = t.id
+  LEFT JOIN payments pay ON pay.application_id = a.id
 
-WHERE a.student_id = 2
-  AND a.application_status IN ('Submitted', 'Approved')
+  WHERE a.student_id = 2
+    AND a.application_status IN ('Approved')
 
-ORDER BY a.submitted_at DESC;
+  ORDER BY a.submitted_at DESC;
     `, [studentId]);
 
     res.json(apps);

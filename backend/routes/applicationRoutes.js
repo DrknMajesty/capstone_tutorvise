@@ -18,7 +18,11 @@ const upload = multer({ storage });
 
 // Admin routes
 router.get('/all-submitted', authenticateToken, applicationController.getSubmittedApplications);
+
+// Approve Application
 router.put('/approve/:id', authenticateToken, applicationController.approveApplication);
+
+// Reject Application
 router.put('/reject/:id', authenticateToken, applicationController.rejectApplication);
 
 // Get current student's application (latest one)

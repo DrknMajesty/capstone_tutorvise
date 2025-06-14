@@ -19,6 +19,7 @@ const StudentPayment = () => {
 
       try {
         const response = await apiService.get(`/applications/${user_id}/my-applications`);
+        console.log("Data:", response);
         const sorted = response.data.sort(
           (a, b) => new Date(b.submitted_at || b.created_at) - new Date(a.submitted_at || a.created_at)
         );
@@ -35,6 +36,17 @@ const StudentPayment = () => {
   }, [user_id]);
 
   const selectedApplication = applications.find((app) => app.id === selectedAppId);
+
+    const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
+    const totalPrice = parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
+    return parseFloat(totalPrice.toFixed(2));
+  };
+
+  const formatCurrency = (amount) => {
+    const num = Number(amount);
+    if (isNaN(num)) return '';
+    return `₱${num.toFixed(2)}`;
+  };
 
   return (
     <div>
@@ -97,8 +109,11 @@ const StudentPayment = () => {
                     <p className="mb-2"><strong>Package:</strong> {selectedApplication.package_name}</p>
                     <p className="mb-2"><strong>Total Sessions:</strong> {selectedApplication.total_sessions}</p>
                     <p className="mb-2"><strong>Price per Session:</strong> ₱{selectedApplication.price_sessions}</p>
-                    <p className="mb-2"><strong>Total Package Price:</strong> ₱{selectedApplication.price_package}</p>
-                    <p className="mb-2">
+                    <p className="mb-2"><strong>Package Price:</strong> ₱{selectedApplication.price_package}</p>
+                    <p className="mb-2"><strong>Total Price:</strong>{formatCurrency(calculateTotalPrice(
+                      selectedApplication.price_package, selectedApplication.total_sessions, selectedApplication.price_sessions)
+                    )}</p>
+                    {/* <p className="mb-2">
                       <strong>Status:</strong>{' '}
                       <span className={`px-2 py-1 rounded text-white ${
                         selectedApplication.status === 'Approved' ? 'bg-green-500'
@@ -107,7 +122,7 @@ const StudentPayment = () => {
                       }`}>
                         {selectedApplication.status}
                       </span>
-                    </p>
+                    </p> */}
                     <p className="mb-2">
                       <strong>Submitted At:</strong>{' '}
                       {new Date(selectedApplication.submitted_at || selectedApplication.created_at).toLocaleString()}
@@ -118,7 +133,6 @@ const StudentPayment = () => {
             )}
 {view === 'ledger' && (
   <div className="bg-white shadow rounded-lg p-6 border">
-    <h2 className="text-2xl font-semibold mb-4">Student Ledger</h2>
 
     <table className="w-full border text-sm">
       <thead>
@@ -126,32 +140,35 @@ const StudentPayment = () => {
           <th className="px-4 py-2">Date</th>
           <th className="px-4 py-2">Reference</th>
           <th className="px-4 py-2">Description</th>
-          <th className="px-4 py-2">Type</th>
-          <th className="px-4 py-2">Amount (₱)</th>
+          <th className="px-4 py-2">Debit (₱)</th>
+          <th className="px-4 py-2">Credit (₱)</th>
         </tr>
       </thead>
       <tbody>
         {applications
           .flatMap((app) => {
+            const totalAmount = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
+            const total = totalAmount > 0 ? formatCurrency(totalAmount) : '';
+
             const entries = [
               {
                 id: `debit-${app.id}`,
                 date: app.submitted_at || app.created_at,
                 reference: `APP#${app.id}`,
-                description: `Tuition Fee for ${app.package_name}`,
-                type: 'Debit',
-                amount: parseFloat(app.price_package),
+                description: `Fee for ${app.package_name}`,
+                debit: total,
+                credit: ''
               }
             ];
 
-            if (app.paid_amount) {
+            if (parseFloat(app.paid_amount) > 0) {
               entries.push({
                 id: `credit-${app.id}`,
-                date: app.paid_at,
+                date: app.payment_date,
                 reference: app.reference || `PAY#${app.id}`,
                 description: `Full Payment for ${app.package_name}`,
-                type: 'Credit',
-                amount: parseFloat(app.paid_amount),
+                debit: '',
+                credit: formatCurrency(app.paid_amount)
               });
             }
 
@@ -163,35 +180,10 @@ const StudentPayment = () => {
               <td className="px-4 py-2">{new Date(entry.date).toLocaleDateString()}</td>
               <td className="px-4 py-2">{entry.reference}</td>
               <td className="px-4 py-2">{entry.description}</td>
-              <td className={`px-4 py-2 font-medium ${entry.type === 'Credit' ? 'text-green-600' : 'text-red-600'}`}>
-                {entry.type}
-              </td>
-              <td className="px-4 py-2">₱{entry.amount.toFixed(2)}</td>
+              <td className="px-4 py-2 text-red-600">{entry.debit || ''}</td>
+              <td className="px-4 py-2 text-green-600">{entry.credit || ''}</td>
             </tr>
           ))}
-
-        {/* Totals */}
-        <tr className="border-t font-bold bg-gray-50">
-          <td colSpan="4" className="px-4 py-2 text-right">Total Debits</td>
-          <td className="px-4 py-2 text-red-600">
-            ₱{applications.reduce((sum, app) => sum + parseFloat(app.price_package || 0), 0).toFixed(2)}
-          </td>
-        </tr>
-        <tr className="border-t font-bold bg-gray-50">
-          <td colSpan="4" className="px-4 py-2 text-right">Total Credits</td>
-          <td className="px-4 py-2 text-green-600">
-            ₱{applications.reduce((sum, app) => sum + parseFloat(app.paid_amount || 0), 0).toFixed(2)}
-          </td>
-        </tr>
-        <tr className="border-t font-bold bg-yellow-50">
-          <td colSpan="4" className="px-4 py-2 text-right">Balance</td>
-          <td className="px-4 py-2 text-black">
-            ₱{(
-              applications.reduce((sum, app) => sum + parseFloat(app.price_package || 0), 0) -
-              applications.reduce((sum, app) => sum + parseFloat(app.paid_amount || 0), 0)
-            ).toFixed(2)}
-          </td>
-        </tr>
       </tbody>
     </table>
   </div>

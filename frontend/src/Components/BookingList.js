@@ -14,12 +14,18 @@ function formatTimeTo12Hour(timeStr) {
 const BookingList = ({ bookings = [], onAccept, onCancel, title, role = 'tutor' }) => {
   const [selectedAppId, setSelectedAppId] = useState('');
 
-  // Extract unique applications as [id, student_name]
+  // Extract unique applications as [application_id, { student_name, package_name }]
   const applications = Array.from(
     new Map(
       bookings
         .filter(b => b.application_id !== undefined && b.application_id !== null)
-        .map(b => [String(b.application_id), b.student_name || 'Unknown Student'])
+        .map(b => [
+          String(b.application_id),
+          {
+            student_name: b.student_name || 'Unknown Student',
+            package_name: b.package_name || 'Unknown Package'
+          }
+        ])
     ).entries()
   );
 
@@ -27,7 +33,7 @@ const BookingList = ({ bookings = [], onAccept, onCancel, title, role = 'tutor' 
     b => String(b.application_id) === String(selectedAppId)
   );
 
-  const studentName = applications.find(([id]) => id === selectedAppId)?.[1];
+  const selectedAppInfo = applications.find(([id]) => id === selectedAppId)?.[1];
 
   return (
     <div className="w-full bg-white shadow-md rounded-lg p-6 border border-gray-200">
@@ -44,9 +50,9 @@ const BookingList = ({ bookings = [], onAccept, onCancel, title, role = 'tutor' 
           required
           options={[
             { value: "", label: "-- Select an application --" },
-            ...applications.map(([appId, student]) => ({
+            ...applications.map(([appId, app]) => ({
               value: appId,
-              label: `${appId} (${student})`
+              label: `Application ID: ${appId} — ${app.student_name} (${app.package_name})`
             }))
           ]}
         />
@@ -60,7 +66,7 @@ const BookingList = ({ bookings = [], onAccept, onCancel, title, role = 'tutor' 
       ) : (
         <div className="mt-4">
           <h3 className="text-lg font-semibold mb-2">
-            Bookings for Application: {selectedAppId} ({studentName})
+            Bookings for Application: {selectedAppId} ({selectedAppInfo?.student_name} — {selectedAppInfo?.package_name})
           </h3>
           <table className="w-full text-left border-collapse">
             <thead>
