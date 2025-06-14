@@ -15,6 +15,7 @@ const menuConfig = {
     { label: "Bookings", path: "/admin/bookings" },
     { label: "Schedules", path: "/admin/schedules" },
     { label: "Sessions", path: "/admin/sessions" },
+    { label: "Reports", path: "/admin/reports" },
     { label: "Profile", path: "/admin/profile", icon: <CircleUser size={18} /> },
   ],
   student: [

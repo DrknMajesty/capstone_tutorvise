@@ -19,6 +19,7 @@ import AdminPaymentManagement from './01_Admin/AdminPayment';
 import AdminBookingManagement from './01_Admin/AdminBooking';
 import AdminScheduleManagement from './01_Admin/AdminSchedules';
 import AdminSessionManagement from './01_Admin/AdminSessions';
+import AdminReportsManagement from './01_Admin/AdminReports';
 
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
@@ -59,6 +60,7 @@ function App() {
           <Route path="/admin/bookings" element={<AdminBookingManagement />} />
           <Route path="/admin/schedules" element={<AdminScheduleManagement />} />
           <Route path="/admin/sessions" element={<AdminSessionManagement />} />
+          <Route path="/admin/reports" element={<AdminReportsManagement />} />
         </Route>
 
         {/* Student Routes */}
