@@ -61,3 +61,45 @@ exports.getTutorFeedbackDetails = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch tutor feedback.' });
   }
 };
+
+exports.getFinanceReport = async (req, res) => {
+  const { start, end } = req.query;
+
+  try {
+    let baseSql = `
+    SELECT
+      a.id AS application_id,
+      a.application_status,
+      CONCAT(s.fname, ' ', s.lname) AS student_name,
+      p.package_name,
+      a.submitted_at,
+      (CAST(p.price_package AS DECIMAL(10,2)) + (CAST(p.price_sessions AS DECIMAL(10,2)) * p.total_sessions)) AS total_price
+    FROM applications a
+    JOIN packages p ON a.package_id = p.id
+    JOIN users s ON a.student_id = s.id
+    WHERE a.application_status IN ('Approved', 'Submitted')
+    `;
+
+    const params = [];
+    if (start && end) {
+      baseSql += ` AND DATE(a.submitted_at) BETWEEN ? AND ?`;
+      params.push(start, end);
+    }
+
+    const [apps] = await db.query(baseSql, params);
+    console.log('Fetched applications:', apps);
+
+  const income = apps
+    .filter(a => a.application_status.toLowerCase() === 'approved')
+    .reduce((sum, a) => sum + parseFloat(a.total_price || 0), 0);
+
+  const receivables = apps
+    .filter(a => a.application_status.toLowerCase() === 'submitted')
+    .reduce((sum, a) => sum + parseFloat(a.total_price || 0), 0);
+
+    res.json({ income, receivables, applications: apps });
+  } catch (err) {
+    console.error('Error generating financial report:', err);
+    res.status(500).json({ message: 'Failed to generate financial report.' });
+  }
+};

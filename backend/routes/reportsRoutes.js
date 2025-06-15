@@ -7,7 +7,9 @@ const reportsController = require('../controllers/reportsController');
 router.get('/tutor-ratings', authenticateToken, reportsController.getTutorRatingsReport);
 
 // Get tutor feedbacks 
-router.get('/tutor-feedback/:tutorId', reportsController.getTutorFeedbackDetails);
+router.get('/tutor-feedback/:tutorId', authenticateToken, reportsController.getTutorFeedbackDetails);
 
+// Get 
+router.get('/finance', authenticateToken, reportsController.getFinanceReport);
 
 module.exports = router;
