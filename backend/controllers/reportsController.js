@@ -1,8 +1,10 @@
 const db = require('../db'); // adjust if your DB connection is elsewhere
 
 exports.getTutorRatingsReport = async (req, res) => {
+  const { start, end } = req.query;
+
   try {
-    const [results] = await db.query(`
+    let query = `
       SELECT 
         u.id AS tutor_id,
         CONCAT(u.fname, ' ', u.lname) AS name,
@@ -13,8 +15,18 @@ exports.getTutorRatingsReport = async (req, res) => {
       JOIN sessions sess ON sess.schedule_id = sch.id
       LEFT JOIN feedback f ON f.session_id = sess.id
       WHERE u.account_type = 'tutor'
-      GROUP BY u.id
-    `);
+    `;
+
+    const params = [];
+
+    if (start && end) {
+      query += ` AND sch.scheduled_date BETWEEN ? AND ?`;
+      params.push(start, end);
+    }
+
+    query += ` GROUP BY u.id`;
+
+    const [results] = await db.query(query, params);
 
     res.json(results);
   } catch (err) {

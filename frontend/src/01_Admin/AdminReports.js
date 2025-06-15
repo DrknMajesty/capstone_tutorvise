@@ -27,6 +27,7 @@ const AdminReportPage = () => {
     try {
       const res = await apiService.get('/reports/tutor-ratings');
       const sorted = res.data.sort((a, b) => b.average_rating - a.average_rating);
+      console.log("Data:", res.data)
       setRatingsData(sorted);
     } catch (err) {
       console.error('Failed to fetch tutor ratings report:', err);
@@ -64,21 +65,27 @@ const AdminReportPage = () => {
         <h1 className="text-2xl font-bold mb-6">Generate Report</h1>
 
         <div className="border-b border-gray-200 mb-6">
-  <nav className="-mb-px flex space-x-8">
-    <button
-      onClick={() => setActiveTab('ratings')}
-      className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${activeTab === 'ratings' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-    >
-      Tutor Ratings
-    </button>
-    <button
-      onClick={() => setActiveTab('comments')}
-      className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${activeTab === 'comments' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-    >
-      Tutor Comments
-    </button>
-  </nav>
-</div>
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('ratings')}
+              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${activeTab === 'ratings' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+              Tutor Ratings
+            </button>
+            <button
+              onClick={() => setActiveTab('comments')}
+              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${activeTab === 'comments' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+              Tutor Comments
+            </button>
+            <button
+              onClick={() => setActiveTab('finance')}
+              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${activeTab === 'finance' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+              Financial Report
+            </button>
+          </nav>
+        </div>
 
         {activeTab === 'ratings' && (
           <>
