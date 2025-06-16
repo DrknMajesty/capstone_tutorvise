@@ -3,7 +3,7 @@
 @tailwind utilities;
 
   .navbar {
-    @apply flex items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 shadow-lg fixed top-0 w-full z-50 h-24;
+    @apply flex items-center justify-between bg-[#6A3E15] text-white px-6 py-4 shadow-lg fixed top-0 w-full z-50 h-24;
   }
 
   .navbar-brand {
@@ -23,7 +23,7 @@
   }  
   
   .nav-link {
-    @apply hover:text-blue-600 transition;
+    @apply hover:text-[#FFD700] transition;
   }
   
   .menu-button {

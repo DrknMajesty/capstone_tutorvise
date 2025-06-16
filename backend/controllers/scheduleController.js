@@ -1,4 +1,5 @@
 const db = require('../db'); // your MySQL2 connection
+const { createNotification } = require('../utils/notification');
 
 exports.getAllSchedules = async (req, res) => {
   try {
@@ -48,33 +49,38 @@ exports.rescheduleSchedule = async (req, res) => {
   }
 
   try {
-    // Get the current schedule info
-    const scheduleRes = await db.query(
-      `SELECT tutor_id, student_id FROM schedules WHERE id = ?`,
-      [scheduleId]
-    );
+    // 1. Fetch the schedule details including names
+    const [scheduleRows] = await db.query(`
+      SELECT 
+        schedules.tutor_id, 
+        schedules.student_id,
+        CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
+        CONCAT(student.fname, ' ', student.lname) AS student_name
+      FROM schedules
+      JOIN users AS tutor ON schedules.tutor_id = tutor.id
+      JOIN users AS student ON schedules.student_id = student.id
+      WHERE schedules.id = ?
+    `, [scheduleId]);
 
-    if (scheduleRes[0].length === 0) {
+    if (scheduleRows.length === 0) {
       return res.status(404).json({ error: 'Schedule not found' });
     }
 
-    const { tutor_id, student_id } = scheduleRes[0][0];
+    const { tutor_id, student_id, tutor_name, student_name } = scheduleRows[0];
 
-    // Check for schedule conflicts
-    const conflictQuery = `
+    // 2. Check for schedule conflicts
+    const [conflicts] = await db.query(`
       SELECT 1 FROM schedules
       WHERE id != ?
-      AND scheduled_date = ?
-      AND (tutor_id = ? OR student_id = ?)
-      AND (
-        (start_time < ? AND end_time > ?) OR
-        (start_time < ? AND end_time > ?) OR
-        (start_time >= ? AND end_time <= ?)
-      )
+        AND scheduled_date = ?
+        AND (tutor_id = ? OR student_id = ?)
+        AND (
+          (start_time < ? AND end_time > ?) OR
+          (start_time < ? AND end_time > ?) OR
+          (start_time >= ? AND end_time <= ?)
+        )
       LIMIT 1
-    `;
-
-    const conflictRes = await db.query(conflictQuery, [
+    `, [
       scheduleId,
       scheduled_date,
       tutor_id,
@@ -87,30 +93,37 @@ exports.rescheduleSchedule = async (req, res) => {
       end_time
     ]);
 
-    if (conflictRes[0].length > 0) {
+    if (conflicts.length > 0) {
       return res.status(409).json({ error: 'Conflict detected with existing schedule.' });
     }
 
-    // Proceed to update the schedule
-    const updateQuery = `
+    // 3. Update the schedule
+    await db.query(`
       UPDATE schedules
-      SET scheduled_date = ?,
-          start_time = ?,
-          end_time = ?
+      SET scheduled_date = ?, start_time = ?, end_time = ?
       WHERE id = ?
-    `;
+    `, [scheduled_date, start_time, end_time, scheduleId]);
 
-    await db.query(updateQuery, [
-      scheduled_date,
-      start_time,
-      end_time,
-      scheduleId
-    ]);
+    // 4. Format message
+    const formattedDate = new Date(scheduled_date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
 
-    return res.json({ message: 'Schedule updated successfully' });
+    const studentMessage = `Your session with ${tutor_name} has been rescheduled to ${formattedDate}, from ${start_time} to ${end_time}.`;
+    const tutorMessage = `The session with ${student_name} has been rescheduled to ${formattedDate}, from ${start_time} to ${end_time}.`;
+
+    // 5. Send notifications
+    await createNotification(student_id, studentMessage);
+    await createNotification(tutor_id, tutorMessage);
+
+    return res.json({ message: 'Schedule updated successfully and notifications sent.' });
 
   } catch (error) {
     console.error('Error rescheduling:', error.stack || error.message || error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+

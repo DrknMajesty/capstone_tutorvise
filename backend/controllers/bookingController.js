@@ -393,7 +393,7 @@ exports.cancelBooking = async (req, res) => {
     const { bookingId } = req.params;
 
   try {
-    // Update the booking status to 'accepted'
+    // Update the booking status to 'Cancelled'
     const [result] = await db.query(`
       UPDATE bookings
       SET status = 'cancelled'
@@ -477,6 +477,10 @@ exports.tutorBookingCancel = async (req, res) => {
     // Send notification to student
     const message = `Your tutor ${tutorName} has cancelled your booking scheduled on ${formattedDate}. Reason: ${cancel_reason}`;
     await createNotification(booking.student_id, message);
+
+    // Send notification to tutor
+    const tutorMessage = `You cancelled a student booking on ${formattedDate}. Reason: ${cancel_reason}`;
+    await createNotification(booking.tutor_id, tutorMessage);
 
     res.status(200).json({
       success: true,

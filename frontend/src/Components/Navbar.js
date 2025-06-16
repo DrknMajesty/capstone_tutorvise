@@ -103,7 +103,7 @@ export default function ResponsiveNavbar() {
             <li>
               <button
                 onClick={handleNavButtonClick}
-                className="nav-link bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700"
+                className="nav-link bg-brown-600 text-white px-4 py-1 rounded hover:bg-yellow-700"
               >
                 {isLandingPage ? "Login" : "Return"}
               </button>
