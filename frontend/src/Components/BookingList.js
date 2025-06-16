@@ -100,13 +100,29 @@ const BookingList = ({ bookings = [], onAccept, onCancel, title, role = 'tutor' 
                   {role !== 'tutor' && (
                     <td className="p-2">{booking.tutor_name || 'N/A'}</td>
                   )}
-                  <td className="p-2">
+                   <td className="p-2">
                     {(role === 'tutor' || role === 'admin') && booking.booking_status === 'pending' && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => onAccept?.(booking.booking_id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => onCancel?.(booking.booking_id)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                    {(role === 'tutor' || role === 'admin') && booking.booking_status === 'scheduled' && (
                       <button
-                        onClick={() => onAccept?.(booking.booking_id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                        onClick={() => onCancel?.(booking.booking_id)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
                       >
-                        Confirm Booking
+                        Cancel
                       </button>
                     )}
 

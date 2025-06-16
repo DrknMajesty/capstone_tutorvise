@@ -3,8 +3,8 @@ import { Menu, X, LogOut, CircleUser } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import "../Styles/Navbar.css";
 import { clearToken } from '../utils/tokenService';
+import NotificationBell from './notificationBell';
 
-// 🔶 Menu configuration per role
 const menuConfig = {
   admin: [
     { label: "Dashboard", path: "/admin/dashboard" },
@@ -41,13 +41,11 @@ export default function ResponsiveNavbar() {
   const location = useLocation();
 
   const toggleSidebar = () => setIsOpen(!isOpen);
-
   const handleLogout = () => {
     clearToken();
     navigate("/");
   };
 
-  // 🔶 Load user and set menu based on role
   useEffect(() => {
     const accountType = sessionStorage.getItem("account_type");
     if (accountType) {
@@ -57,11 +55,12 @@ export default function ResponsiveNavbar() {
 
   const isLandingPage = location.pathname === "/";
   const isLoginPage = location.pathname === "/login";
-
   const handleNavButtonClick = () => {
     if (isLandingPage) navigate("/login");
     else if (isLoginPage) navigate("/");
   };
+
+  const userId = sessionStorage.getItem("user_id");
 
   return (
     <div>
@@ -83,6 +82,13 @@ export default function ResponsiveNavbar() {
 
         {/* 🔷 Desktop Menu */}
         <ul className="nav-links-horizontal">
+        {/* Notification Bell */}
+          {!isLandingPage && !isLoginPage && userId && (
+            <li>
+              <NotificationBell userId={userId} />
+            </li>
+          )}
+
           {menuItems.map((item) => (
             <li key={item.path}>
               <Link to={item.path} className="nav-link" title={item.label}>
@@ -91,6 +97,8 @@ export default function ResponsiveNavbar() {
             </li>
           ))}
 
+
+          {/* Login / Logout Buttons */}
           {isLandingPage || isLoginPage ? (
             <li>
               <button
@@ -132,19 +140,29 @@ export default function ResponsiveNavbar() {
           <h2 className="text-lg font-semibold">Menu</h2>
         </div>
         <ul className="nav-links-vertical">
-        {menuItems.map((item) => (
-          <li key={item.path}>
-            <Link
-              to={item.path}
-              className="nav-link flex items-center gap-2"
-              onClick={toggleSidebar}
-            >
-              {item.icon && <span>{item.icon}</span>}
-              <span>{item.label}</span>
-            </Link>
-          </li>
-        ))}
+          {/* Mobile Notification Bell */}
+          {!isLandingPage && !isLoginPage && userId && (
+            <li>
+              <NotificationBell userId={userId} />
+            </li>
+          )}
 
+          {menuItems.map((item) => (
+            <li key={item.path}>
+              <Link
+                to={item.path}
+                className="nav-link flex items-center gap-2"
+                onClick={toggleSidebar}
+              >
+                {item.icon && <span>{item.icon}</span>}
+                <span>{item.label}</span>
+              </Link>
+            </li>
+          ))}
+
+
+
+          {/* Login / Logout Buttons */}
           {isLandingPage || isLoginPage ? (
             <li>
               <button

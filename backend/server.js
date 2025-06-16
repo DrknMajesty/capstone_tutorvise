@@ -11,6 +11,7 @@ const applicationRoutes = require('./routes/applicationRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const reportRoutes = require('./routes/reportsRoutes');
+const notification = require('./routes/notificationRoutes');
 const path = require('path');
 const db = require('./db'); // Make sure you have this import
 
@@ -48,6 +49,7 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/notifications', notification);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
