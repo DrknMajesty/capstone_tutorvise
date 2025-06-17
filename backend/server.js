@@ -12,8 +12,14 @@ const scheduleRoutes = require('./routes/scheduleRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const reportRoutes = require('./routes/reportsRoutes');
 const notification = require('./routes/notificationRoutes');
+// Dashboards
+const studentSummaryDashboard = require('./routes/studentdashboardRoutes');
+const tutorSummaryDashboard = require('./routes/tutordashboardRoutes');
+const adminSummary = require('./routes/admindashboardRoutes');
 const path = require('path');
 const db = require('./db'); // Make sure you have this import
+require('./reminderJob'); // Starts the cron job
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +56,9 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notification);
+app.use('/api/student', studentSummaryDashboard);
+app.use('/api/tutor', tutorSummaryDashboard);
+app.use('/api/admin', adminSummary);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

@@ -21,7 +21,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username, account_type: user.account_type },
       process.env.JWT_SECRET, // <-- FIXED: now uses the same secret
-      { expiresIn: '1h' }
+      { expiresIn: '3h' }
     );
 
     return res.json({ token, account_type: user.account_type });

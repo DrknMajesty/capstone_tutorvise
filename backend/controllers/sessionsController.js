@@ -7,7 +7,6 @@ exports.getAllSessions = async (req, res) => {
       SELECT 
         s.id AS session_id,
         s.status,
-        s.confirmed_at,
         sc.scheduled_date,
         sc.start_time,
         sc.end_time,
@@ -65,7 +64,6 @@ exports.getSessionLogs = async (req, res) => {
       SELECT 
         s.id AS session_id,
         s.status,
-        s.confirmed_at,
         s.updated_at,
         sc.scheduled_date,
         sc.start_time,
@@ -96,7 +94,6 @@ exports.getSessionsByTutor = async (req, res) => {
       SELECT 
         s.id AS session_id,
         s.status,
-        s.confirmed_at,
         sc.scheduled_date,
         sc.start_time,
         sc.end_time,
@@ -147,7 +144,6 @@ exports.getStudentSessions = async (req, res) => {
     SELECT 
       s.id AS session_id,
       s.status,
-      s.confirmed_at,
       sc.scheduled_date,
       sc.start_time,
       sc.end_time,

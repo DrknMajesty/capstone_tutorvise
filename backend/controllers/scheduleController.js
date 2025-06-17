@@ -104,7 +104,7 @@ exports.rescheduleSchedule = async (req, res) => {
       WHERE id = ?
     `, [scheduled_date, start_time, end_time, scheduleId]);
 
-    // 4. Format message
+    // 4. Format message with 12-hour time
     const formattedDate = new Date(scheduled_date).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -112,12 +112,41 @@ exports.rescheduleSchedule = async (req, res) => {
       day: 'numeric'
     });
 
-    const studentMessage = `Your session with ${tutor_name} has been rescheduled to ${formattedDate}, from ${start_time} to ${end_time}.`;
-    const tutorMessage = `The session with ${student_name} has been rescheduled to ${formattedDate}, from ${start_time} to ${end_time}.`;
+    const [startHour, startMinute] = start_time.split(':');
+    const [endHour, endMinute] = end_time.split(':');
 
-    // 5. Send notifications
+    const startDateTime = new Date(scheduled_date);
+    startDateTime.setHours(startHour, startMinute);
+    const endDateTime = new Date(scheduled_date);
+    endDateTime.setHours(endHour, endMinute);
+
+    const formattedStartTime = startDateTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const formattedEndTime = endDateTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const studentMessage = `Your session with ${tutor_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
+    const tutorMessage = `Your session with ${student_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
+
+    // 5. Send notifications to student and tutor
     await createNotification(student_id, studentMessage);
     await createNotification(tutor_id, tutorMessage);
+
+    // 6. Notify all admins
+    const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'Admin' AND status = 'active'`);
+
+    const adminMessage = `Schedule between ${student_name} and ${tutor_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
+
+    for (const admin of admins) {
+      await createNotification(admin.id, adminMessage);
+    }
 
     return res.json({ message: 'Schedule updated successfully and notifications sent.' });
 
@@ -126,4 +155,3 @@ exports.rescheduleSchedule = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
-
