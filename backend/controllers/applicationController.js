@@ -1,5 +1,6 @@
 const db = require('../db');
 const expireOldApplications = require('../utils/expireApplications');
+const { createNotification } = require('../utils/notification');
 
 // Get current user's latest application
 exports.getMyApplication = async (req, res) => {
@@ -73,6 +74,7 @@ exports.submitPaymentProof = async (req, res) => {
   }
 
   try {
+    // ✅ Update the application
     await db.query(`
       UPDATE applications 
       SET payment_proof = ?, 
@@ -81,12 +83,30 @@ exports.submitPaymentProof = async (req, res) => {
       WHERE id = ?;
     `, [paymentProof, applicationId]);
 
-    res.json({ message: 'Payment proof submitted successfully.' });
+    // ✅ Get student info (optional)
+    const [[studentResult]] = await db.query(`
+      SELECT student_id, CONCAT(u.fname, ' ', u.lname) AS student_name
+      FROM applications a
+      JOIN users u ON a.student_id = u.id
+      WHERE a.id = ?;
+    `, [applicationId]);
+
+    const studentName = studentResult?.student_name || 'A student';
+    const studentId = studentResult?.student_id;
+
+    // ✅ Notify all admins
+    const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'admin'`);
+    for (const admin of admins) {
+      await createNotification(admin.id, `New application submitted by ${studentName}`);
+    }
+
+    res.json({ message: 'Payment proof submitted and admin notified.' });
   } catch (err) {
     console.error('Error uploading proof:', err);
     res.status(500).json({ message: 'Server error.' });
   }
 };
+
 // Cancel Application
 exports.cancelApplication = async (req, res) => {
   const applicationId = req.params.id;
@@ -120,6 +140,9 @@ exports.cancelApplication = async (req, res) => {
       ['available', application.timeslot_id]
     );
 
+    // ✅ Create a notification for the student
+    await createNotification(application.student_id, `Your application #${applicationId} has been cancelled.`);
+
     return res.status(200).json({ message: 'Application cancelled and timeslot made available' });
   } catch (error) {
     console.error('Cancel application error:', error);
@@ -133,7 +156,7 @@ exports.getSubmittedApplications = async (req, res) => {
   try {
     const query = `
       SELECT a.*, 
-             p.package_name, p.price_package,
+             p.package_name, p.price_package, p.total_sessions, p.price_sessions,
              s.fname AS student_fname, s.lname AS student_lname,
              t.fname AS tutor_fname, t.lname AS tutor_lname
       FROM applications a
@@ -158,7 +181,22 @@ exports.approveApplication = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Step 1: Update the application status and expiry
+    const [rows] = await db.query(
+      'SELECT * FROM applications WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const application = rows[0];
+
+    if (application.application_status !== 'submitted') {
+      return res.status(400).json({ message: 'Only pending applications can be cancelled' });
+    }
+
+    // Step 1: Update application status
     const updateAppQuery = `
       UPDATE applications
       SET application_status = 'Approved',
@@ -167,9 +205,9 @@ exports.approveApplication = async (req, res) => {
     `;
     await connection.query(updateAppQuery, [id]);
 
-    // Step 2: Get timeslot_id and package_id from the application
+    // Step 2: Get timeslot_id, package_id, and student_id from the application
     const [appRows] = await connection.query(
-      `SELECT timeslot_id, package_id FROM applications WHERE id = ?`,
+      `SELECT timeslot_id, package_id, student_id FROM applications WHERE id = ?`,
       [id]
     );
 
@@ -177,10 +215,9 @@ exports.approveApplication = async (req, res) => {
       throw new Error('Timeslot not found for the application.');
     }
 
-    const timeslotId = appRows[0].timeslot_id;
-    const packageId = appRows[0].package_id;
+    const { timeslot_id: timeslotId, package_id: packageId, student_id: studentId } = appRows[0];
 
-    // Step 3: Get package details to calculate total price
+    // Step 3: Get package details
     const [packageRows] = await connection.query(
       `SELECT price_package, total_sessions, price_sessions FROM packages WHERE id = ?`,
       [packageId]
@@ -196,20 +233,20 @@ exports.approveApplication = async (req, res) => {
 
     const amountPaid = Number((pricePackage + totalSessions * pricePerSession).toFixed(2));
 
-    // Step 4: Update the timeslot status to 'booked'
-    const updateTimeslotQuery = `
-      UPDATE timeslots
-      SET status = 'booked'
-      WHERE id = ?
-    `;
-    await connection.query(updateTimeslotQuery, [timeslotId]);
+    // Step 4: Update timeslot status
+    await connection.query(
+      `UPDATE timeslots SET status = 'booked' WHERE id = ?`,
+      [timeslotId]
+    );
 
-    // Step 5: Insert payment record with calculated total price
-    const insertPaymentQuery = `
-      INSERT INTO payments (application_id, amount_paid, payment_date)
-      VALUES (?, ?, NOW())
-    `;
-    await connection.query(insertPaymentQuery, [id, amountPaid]);
+    // Step 5: Insert payment record
+    await connection.query(
+      `INSERT INTO payments (application_id, amount_paid, payment_date) VALUES (?, ?, NOW())`,
+      [id, amountPaid]
+    );
+
+    // ✅ Step 6: Create notification
+    await createNotification(application.student_id,`Your application #${id} has been approved. You have 30 days to booked dates for tutorial.`);
 
     await connection.commit();
     res.status(200).json({ message: 'Application approved, timeslot booked, and payment recorded.' });
@@ -223,16 +260,41 @@ exports.approveApplication = async (req, res) => {
 };
 
 
+
 // Reject application
 exports.rejectApplication = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const [rows] = await db.query(
+      'SELECT * FROM applications WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const application = rows[0];
+
+    if (application.application_status !== 'submitted') {
+      return res.status(400).json({ message: 'Only pending applications can be cancelled' });
+    }
 
     const query = `
       UPDATE applications
       SET application_status = 'Cancelled'
       WHERE id = ?
     `;
+
+      await db.query(
+        'UPDATE timeslots SET status = ? WHERE id = ?',
+        ['available', application.timeslot_id]
+      );
+
+     // ✅ Step 6: Create notification
+    await createNotification(application.student_id,`Your application #${id} has been cancelled. Contact Admin for futher instructions.`);
+
     await db.query(query, [id]);
     res.status(200).json({ message: 'Application rejected.' });
   } catch (err) {
@@ -289,3 +351,43 @@ exports.expireSingleApplication = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.getMyApplications = async (req, res) => {
+  const studentId = req.user.id;
+  try {
+    const [apps] = await db.query(`
+  SELECT 
+    a.id,
+    a.tutor_id,
+    a.package_id,
+    a.application_status AS status,
+    a.submitted_at,
+    a.created_at,
+    p.package_name, 
+    p.price_package, 
+    p.total_sessions, 
+    p.price_sessions,
+    t.fname AS tutor_fname, 
+    t.lname AS tutor_lname,
+    pay.id AS payment_id,
+    pay.amount_paid AS paid_amount,
+    pay.payment_date
+
+  FROM applications a
+  JOIN packages p ON a.package_id = p.id
+  JOIN users t ON a.tutor_id = t.id
+  LEFT JOIN payments pay ON pay.application_id = a.id
+
+  WHERE a.student_id = ?
+    AND a.application_status IN ('Approved', 'Done')
+
+  ORDER BY a.submitted_at DESC;
+    `, [studentId]);
+
+    res.json(apps);
+  } catch (err) {
+    console.error('Error fetching applications:', err);
+    res.status(500).json({ message: 'Server error.' });
+  }
+};
+

@@ -1,4 +1,5 @@
 const db = require('../db');
+const { createNotification } = require('../utils/notification'); // adjust path if needed
 
 // GET /api/sessions
 exports.getAllSessions = async (req, res) => {
@@ -7,7 +8,6 @@ exports.getAllSessions = async (req, res) => {
       SELECT 
         s.id AS session_id,
         s.status,
-        s.confirmed_at,
         sc.scheduled_date,
         sc.start_time,
         sc.end_time,
@@ -57,6 +57,65 @@ exports.updateSessionStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update session status' });
   }
 };
+// Tutor request for status update
+exports.requestStatusUpdate = async (req, res) => {
+  console.log('🚨 [Manual Status Request] Controller triggered');
+
+  const { id } = req.params;
+  const sessionId = parseInt(id, 10);
+  const { status } = req.body;
+
+  console.log('Request Params:', { id: sessionId, status });
+
+  if (isNaN(sessionId) || !status) {
+    return res.status(400).json({ error: 'Invalid session ID or missing status' });
+  }
+
+  try {
+    const [[session]] = await db.query(`
+      SELECT s.id, s.schedule_id, sch.student_id, sch.tutor_id, sch.scheduled_date,
+             CONCAT(u.fname, ' ', u.lname) AS tutor_name
+      FROM sessions s
+      JOIN schedules sch ON s.schedule_id = sch.id
+      JOIN users u ON sch.tutor_id = u.id
+      WHERE s.id = ?
+    `, [sessionId]);
+
+    if (!session) {
+      console.log('❌ Session not found');
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const { tutor_id, tutor_name, scheduled_date } = session;
+
+    const [admins] = await db.query(`
+      SELECT id FROM users WHERE account_type = 'admin' AND status = 'active'
+    `);
+
+    // Respond immediately
+    res.json({ message: 'Request to update session status has been sent to admins.' });
+
+    // Notify in background
+    setImmediate(async () => {
+      const messageToAdmins = `Tutor ${tutor_name} requested to update session ID ${sessionId} to "${status}".`;
+      const messageToTutor = `Your request to update session on ${scheduled_date} to "${status}" has been sent.`;
+
+      for (const admin of admins) {
+        await createNotification(admin.id, messageToAdmins);
+      }
+
+      await createNotification(tutor_id, messageToTutor);
+
+      console.log(`✅ Notifications sent to ${admins.length} admin(s) and tutor ID ${tutor_id}`);
+    });
+
+  } catch (err) {
+    console.error('❌ Error sending session status request:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to send request for status update' });
+    }
+  }
+};
 
 // Get recent session status update logs (optional)
 exports.getSessionLogs = async (req, res) => {
@@ -65,7 +124,6 @@ exports.getSessionLogs = async (req, res) => {
       SELECT 
         s.id AS session_id,
         s.status,
-        s.confirmed_at,
         s.updated_at,
         sc.scheduled_date,
         sc.start_time,
@@ -87,3 +145,144 @@ exports.getSessionLogs = async (req, res) => {
   }
 };
 
+exports.getSessionsByTutor = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        s.id AS session_id,
+        s.status,
+        sc.scheduled_date,
+        sc.start_time,
+        sc.end_time,
+        student.lname AS student_name,
+        tutor.lname AS tutor_name,
+        f.rating,
+        f.comment
+      FROM sessions s
+      JOIN schedules sc ON s.schedule_id = sc.id
+      JOIN users AS student ON sc.student_id = student.id
+      JOIN users AS tutor ON sc.tutor_id = tutor.id
+      LEFT JOIN feedback f ON f.session_id = s.id
+      WHERE tutor.id = ?
+      ORDER BY sc.scheduled_date, sc.start_time
+      `,
+      [id]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching tutor sessions:', err);
+    res.status(500).json({ error: 'Failed to fetch tutor sessions' });
+  }
+};
+
+exports.autoUpdateSessionStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE sessions SET status = ?, updated_at = NOW() WHERE id = ?',
+      [status, id]
+    );
+    res.json({ message: 'Session status updated' });
+  } catch (err) {
+    console.error('Error updating session status:', err);
+    res.status(500).json({ error: 'Failed to update session status' });
+  }
+};
+
+// GET /sessions/student/:studentId
+exports.getStudentSessions = async (req, res) => {
+  const { studentId } = req.params;
+
+  try {
+    const [rows] = await db.execute(`
+    SELECT 
+      s.id AS session_id,
+      s.status,
+      sc.scheduled_date,
+      sc.start_time,
+      sc.end_time,
+      student.lname AS student_name,
+      tutor.lname AS tutor_name,
+      f.rating,
+      f.comment
+    FROM sessions s
+    JOIN schedules sc ON s.schedule_id = sc.id
+    JOIN users AS student ON sc.student_id = student.id
+    JOIN users AS tutor ON sc.tutor_id = tutor.id
+    LEFT JOIN feedback f ON f.session_id = s.id
+    WHERE student.id = ?
+    ORDER BY sc.scheduled_date, sc.start_time;
+    `,  
+      [studentId]
+    );
+
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error('Error fetching student sessions:', err);
+    res.status(500).json({ error: 'Failed to retrieve sessions' });
+  }
+};
+
+// POST /sessions/:sessionId/feedback
+exports.submitFeedback = async (req, res) => {
+  const { sessionId } = req.params;
+  const { rating, comment } = req.body;
+
+  try {
+    // Ensure the session exists and is confirmed
+    const [existing] = await db.execute(
+      `SELECT status FROM sessions WHERE id = ?`,
+      [sessionId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (existing[0].status !== 'confirmed') {
+      return res.status(400).json({ error: 'Session is not confirmed for feedback' });
+    }
+
+    // Insert or update feedback
+    await db.execute(
+      `INSERT INTO feedback (session_id, rating, comment)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment)`,
+      [sessionId, rating, comment]
+    );
+
+    res.status(200).json({ message: 'Feedback submitted successfully' });
+  } catch (err) {
+    console.error('Error submitting feedback:', err);
+    res.status(500).json({ error: 'Failed to submit feedback' });
+  }
+};
+
+// GET /sessions/:sessionId/feedback
+exports.getFeedback = async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT rating, comment
+       FROM feedback
+       WHERE session_id = ?`,
+      [sessionId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No feedback submitted for this session' });
+    }
+
+    res.status(200).json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching feedback:', err);
+    res.status(500).json({ error: 'Failed to retrieve feedback' });
+  }
+};

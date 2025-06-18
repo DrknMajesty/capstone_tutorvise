@@ -23,6 +23,9 @@ router.get('/all-bookings', authenticateToken, bookingController.getAllApplicati
 // get bookings of the tutor
 router.get('/tutors/:tutorId/bookings', authenticateToken, bookingController.getBookingsForTutor);
 
+// Tutor Cancel Bookings
+router.put('/tutors/:bookingId/cancel', authenticateToken, bookingController.tutorBookingCancel);
+
 // // POST accept a booking
 // router.post('/bookings/:bookingId/accept', authenticateToken, bookingController.acceptBooking);
 
@@ -34,7 +37,7 @@ router.get('/students/:studentId/bookings', authenticateToken, bookingController
 router.put('/:bookingId/confirm', authenticateToken, bookingController.acceptBooking);
 
 // Cancel Booking
-router.put('/:bookingId/cancel', authenticateToken, bookingController.cancelBooking);
+router.patch('/:bookingId/cancel', authenticateToken, bookingController.cancelBooking);
 
 
 module.exports = router;

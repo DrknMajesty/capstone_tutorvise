@@ -1,111 +1,280 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
 
 const TutorSessionsPage = () => {
-  const username = sessionStorage.getItem('username') || '';
+  const user_id = sessionStorage.getItem('user_id') || '';
   const [sessions, setSessions] = useState([]);
+  const [filteredSessions, setFilteredSessions] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [statusUpdates, setStatusUpdates] = useState({});
+  const [modalInfo, setModalInfo] = useState({ open: false, sessionId: null, action: '' });
 
-  useEffect(() => {
-    fetchSessions();
-    const interval = setInterval(checkSessionStatus, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, []);
+  const [viewMode, setViewMode] = useState('byDate');
+  const [currentPage, setCurrentPage] = useState(1);
+  const sessionsPerPage = 5;
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
-      const res = await apiService.get(`/sessions/tutor/${username}`);
+      const res = await apiService.get(`/sessions/tutor/${user_id}`);
       setSessions(res.data);
     } catch (err) {
       console.error('Failed to load sessions:', err);
     }
-  };
+  }, [user_id]);
 
-  const checkSessionStatus = () => {
+  const autoUpdateSessionStatus = useCallback(() => {
     const now = new Date();
-    setSessions(prev => prev.map(session => {
-      const sessionDate = new Date(session.scheduled_date);
-      const startTime = new Date(`1970-01-01T${session.start_time}Z`);
-      const endTime = new Date(`1970-01-01T${session.end_time}Z`);
+    setSessions(prev =>
+      prev.map(session => {
+        const sessionDate = new Date(session.scheduled_date);
+        const start = new Date(sessionDate);
+        const end = new Date(sessionDate);
 
-      const sessionStart = new Date(sessionDate);
-      sessionStart.setHours(startTime.getHours(), startTime.getMinutes());
-      
-      const sessionEnd = new Date(sessionDate);
-      sessionEnd.setHours(endTime.getHours(), endTime.getMinutes());
+        const [sh, sm] = session.start_time.split(":");
+        const [eh, em] = session.end_time.split(":");
+        start.setHours(Number(sh), Number(sm));
+        end.setHours(Number(eh), Number(em));
 
-      if (now >= sessionStart && now <= sessionEnd && session.status !== 'completed') {
-        return { ...session, status: 'ongoing' };
-      } else if (now > sessionEnd && session.status === 'ongoing') {
-        return { ...session, status: 'completed' };
-      }
-      return session;
-    }));
-  };
+        if (
+          now >= start &&
+          now < end &&
+          !['ongoing', 'confirmed', 'missed'].includes(session.status)
+        ) {
+          updateStatusOnServer(session.session_id, 'ongoing');
+          return { ...session, status: 'ongoing' };
+        }
 
-  const handleStatusUpdate = async (id, status) => {
+        if (
+          now >= end &&
+          !['completed', 'confirmed', 'missed'].includes(session.status)
+        ) {
+          updateStatusOnServer(session.session_id, 'completed');
+          return { ...session, status: 'completed' };
+        }
+
+        return session;
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+    autoUpdateSessionStatus();
+    const interval = setInterval(autoUpdateSessionStatus, 60000);
+    return () => clearInterval(interval);
+  }, [fetchSessions, autoUpdateSessionStatus]);
+
+  useEffect(() => {
+    const filtered = sessions.filter(session => {
+      const localDate = new Date(session.scheduled_date);
+      const adjustedDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+        .toISOString().split('T')[0];
+      return adjustedDate === selectedDate;
+    });
+    setFilteredSessions(filtered);
+  }, [sessions, selectedDate]);
+
+  const updateStatusOnServer = async (id, status) => {
     try {
-      await apiService.put(`/sessions/${id}/status`, { status });
-      setSessions(prev => prev.map(session => 
-        session.id === id ? { ...session, status } : session
-      ));
+      await apiService.put(`/sessions/${id}/auto-status`, { status });
     } catch (err) {
       console.error('Failed to update session status:', err);
     }
   };
 
-  return (
-    <div>
-      <ResponsiveNavbar username={username} />
-      <div className="h-24" />
+  const handleDateChange = (e) => setSelectedDate(e.target.value);
 
-      <div className="max-w-5xl mx-auto px-6">
-        <h1 className="text-2xl font-bold mb-6">My Sessions</h1>
-        <div className="grid gap-4">
-          {sessions.map((session) => (
-            <div
-              key={session.session_id}
-              className="border border-gray-300 rounded-md p-4 flex justify-between items-center shadow-sm"
-            >
-              <div>
-                <p><strong>Student:</strong> {session.student_name}</p>
-                <p><strong>Date:</strong> {new Date(session.scheduled_date).toISOString().slice(0, 10)}</p>
-                <p><strong>Time:</strong>   
-                  {new Date(`1970-01-01T${session.start_time}Z`).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  })} - 
-                  {new Date(`1970-01-01T${session.end_time}Z`).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </p>
-                <p><strong>Status:</strong> {session.status}</p>
-              </div>
-              <div>
+  const handleStatusChange = (id, status) => {
+    setStatusUpdates(prev => ({ ...prev, [id]: status }));
+  };
+
+  const saveStatus = async (id) => {
+    const session = sessions.find(s => s.session_id === id);
+    const status = statusUpdates[id];
+
+    if (!status || session.status !== 'completed') return;
+
+    try {
+      await apiService.put(`/sessions/${id}/status/request`, { status });
+
+      setSessions(prev =>
+        prev.map(session =>
+          session.session_id === id ? { ...session, status } : session
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update session status:', err.response?.data || err.message);
+    }
+  };
+
+  const confirmAction = () => {
+    handleStatusChange(modalInfo.sessionId, modalInfo.action);
+    saveStatus(modalInfo.sessionId);
+    setModalInfo({ open: false, sessionId: null, action: '' });
+  };
+
+  const indexOfLast = currentPage * sessionsPerPage;
+  const indexOfFirst = indexOfLast - sessionsPerPage;
+  const currentSessions = sessions.slice(indexOfFirst, indexOfLast);
+  const totalPages = Math.ceil(sessions.length / sessionsPerPage);
+
+  const SessionTable = ({ data }) => (
+    <div className="overflow-x-auto mb-10">
+      <table className="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border px-4 py-2 text-left">Student</th>
+            <th className="border px-4 py-2 text-left">Date</th>
+            <th className="border px-4 py-2 text-left">Time</th>
+            <th className="border px-4 py-2 text-left">Status</th>
+            <th className="border px-4 py-2 text-left">Student Feedback</th>
+            <th className="border px-4 py-2 text-left">Request Status Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((session) => (
+            <tr key={session.session_id} className="hover:bg-gray-50">
+              <td className="border px-4 py-2">{session.student_name}</td>
+              <td className="border px-4 py-2">{new Date(session.scheduled_date).toLocaleDateString()}</td>
+              <td className="border px-4 py-2">
+                {new Date(`1970-01-01T${session.start_time}`).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit', hour12: true,
+                })} - {new Date(`1970-01-01T${session.end_time}`).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit', hour12: true,
+                })}
+              </td>
+              <td className="border px-4 py-2 capitalize">{session.status}</td>
+              <td className="border px-4 py-2">
+                {session.rating && session.comment ? (
+                  <div>
+                    <div className="flex items-center text-yellow-500 text-sm">
+                      {'★'.repeat(session.rating)}{'☆'.repeat(5 - session.rating)}
+                      <span className="text-xs text-gray-500 ml-2">({session.rating}/5)</span>
+                    </div>
+                    <p className="text-sm italic text-gray-600 mt-1">{session.comment}</p>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No feedback</span>
+                )}
+              </td>
+              <td className="border px-4 py-2">
                 {session.status === 'completed' && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => handleStatusUpdate(session.id, 'confirmed')}
-                      className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                      onClick={() => setModalInfo({ open: true, sessionId: session.session_id, action: 'confirmed' })}
+                      className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
                     >
-                      Confirm Completion
+                      Confirm
                     </button>
                     <button
-                      onClick={() => handleStatusUpdate(session.id, 'missed')}
-                      className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
+                      onClick={() => setModalInfo({ open: true, sessionId: session.session_id, action: 'missed' })}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
                     >
-                      Report Missed
+                      Missed
                     </button>
                   </div>
                 )}
-              </div>
-            </div>
+              </td>
+            </tr>
           ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div>
+      <ResponsiveNavbar />
+      <div className="h-24" />
+      <div className="items-center justify-center flex flex-col">
+        <div className="max-w-5xl w-full mx-auto p-6">
+          <h1 className="text-2xl font-bold mb-6">My Sessions</h1>
+
+          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <label className="block font-medium mb-1">View Mode:</label>
+              <select
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-1"
+              >
+                <option value="byDate">Sessions by Date</option>
+                <option value="all">All Sessions</option>
+              </select>
+            </div>
+            {viewMode === 'byDate' && (
+              <div>
+                <label className="block font-medium mb-1">Select Date:</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  className="border border-gray-300 rounded-md px-3 py-1"
+                />
+              </div>
+            )}
+          </div>
+
+          {viewMode === 'byDate' ? (
+            filteredSessions.length === 0 ? (
+              <p className="text-gray-500 mb-8">No sessions on selected date.</p>
+            ) : (
+              <SessionTable data={filteredSessions} />
+            )
+          ) : (
+            <>
+              <SessionTable data={currentSessions} />
+              <div className="flex justify-center items-center mt-4 space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {modalInfo.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded shadow-md w-80">
+            <h3 className="text-lg font-semibold mb-4">Confirm Action</h3>
+            <p className="mb-4">
+              Are you sure you want to mark this session as <strong>{modalInfo.action}</strong>?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setModalInfo({ open: false, sessionId: null, action: '' })}
+                className="px-3 py-1 bg-gray-300 text-black rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAction}
+                className={`px-3 py-1 text-white rounded ${
+                  modalInfo.action === 'confirmed'
+                    ? 'bg-green-500 hover:bg-green-600'
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

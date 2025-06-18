@@ -1,4 +1,5 @@
 const db = require('../db');
+const { createNotification } = require('../utils/notification');
 
 // Get Active Packages
 exports.getActivePackage = async (req, res) => {
@@ -91,7 +92,7 @@ exports.submitApplication = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
-
+// 
 exports.scheduleSessions = async (req, res) => {
   const { application_id, dates } = req.body;
 
@@ -127,7 +128,7 @@ exports.scheduleSessions = async (req, res) => {
     return res.status(500).json({ message: 'Failed to book sessions' });
   }
 };
-
+// Get Application with Bookings
 exports.getAllApplicationsWithBookings = async (req, res) => {
   try {
     const [rows] = await db.query(`
@@ -156,7 +157,7 @@ exports.getAllApplicationsWithBookings = async (req, res) => {
       JOIN packages p ON a.package_id = p.id
       LEFT JOIN bookings b ON a.id = b.application_id
 
-      WHERE a.application_status = 'Approved'
+      WHERE a.application_status IN ('Approved', 'Done')
 
       ORDER BY a.created_at DESC, b.created_at DESC
     `);
@@ -167,7 +168,6 @@ exports.getAllApplicationsWithBookings = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 // Get bookings for specific tutor
 exports.getBookingsForTutor = async (req, res) => {
   const { tutorId } = req.params;
@@ -199,7 +199,7 @@ exports.getBookingsForTutor = async (req, res) => {
     JOIN packages p ON a.package_id = p.id
     LEFT JOIN bookings b ON a.id = b.application_id
 
-    WHERE a.tutor_id = ? AND a.application_status = 'Approved'
+    WHERE a.tutor_id = ? AND a.application_status IN ('Approved', 'Done')
     ORDER BY a.created_at DESC, b.session_date ASC
     `, [tutorId]);
 
@@ -212,21 +212,30 @@ exports.getBookingsForTutor = async (req, res) => {
 //  Accept bookings
 exports.acceptBooking = async (req, res) => {
   const { bookingId } = req.params;
-
-  const connection = await db.getConnection(); // Get a connection from the pool
+  const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    // Fetch booking details
+    // 1. Fetch booking details including total_sessions and timeslot
     const [bookings] = await connection.query(`
-        SELECT 
-          bookings.*, 
-          applications.snapshot_start_time, 
-          applications.snapshot_end_time
-        FROM bookings
-        JOIN applications ON bookings.application_id = applications.id
-        WHERE bookings.id = ?
+      SELECT 
+        bookings.*, 
+        applications.snapshot_start_time, 
+        applications.snapshot_end_time,
+        applications.timeslot_id,
+        applications.package_id,
+        applications.id AS application_id,
+        packages.total_sessions,
+        packages.package_name,
+        CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
+        CONCAT(student.fname, ' ', student.lname) AS student_name
+      FROM bookings
+      JOIN applications ON bookings.application_id = applications.id
+      JOIN packages ON applications.package_id = packages.id
+      JOIN users AS tutor ON bookings.tutor_id = tutor.id
+      JOIN users AS student ON bookings.student_id = student.id
+      WHERE bookings.id = ?
     `, [bookingId]);
 
     if (bookings.length === 0) {
@@ -237,7 +246,7 @@ exports.acceptBooking = async (req, res) => {
 
     const booking = bookings[0];
 
-    // Update the booking status to 'accepted'
+    // 2. Update booking status
     const [updateResult] = await connection.query(`
       UPDATE bookings
       SET status = 'accepted'
@@ -250,7 +259,7 @@ exports.acceptBooking = async (req, res) => {
       return res.status(404).json({ error: 'Failed to update booking' });
     }
 
-    // Insert into schedules table
+    // 3. Insert into schedules
     const [scheduleResult] = await connection.query(`
       INSERT INTO schedules (booking_id, tutor_id, student_id, scheduled_date, start_time, end_time)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -265,16 +274,68 @@ exports.acceptBooking = async (req, res) => {
 
     const scheduleId = scheduleResult.insertId;
 
-    // Insert into sessions table
+    // 4. Insert into sessions
     await connection.query(`
       INSERT INTO sessions (schedule_id, status)
       VALUES (?, 'upcoming')
     `, [scheduleId]);
 
+    // 5. Count accepted bookings for this application
+    const [acceptedCountResult] = await connection.query(`
+      SELECT COUNT(*) AS accepted_count
+      FROM bookings
+      WHERE application_id = ? AND status = 'accepted'
+    `, [booking.application_id]);
+
+    const acceptedCount = acceptedCountResult[0].accepted_count;
+
+    let applicationMarkedDone = false;
+
+    // 6. If all sessions accepted, update timeslot and application
+    if (acceptedCount === booking.total_sessions) {
+      await connection.query(`
+        UPDATE timeslots
+        SET status = 'available'
+        WHERE id = ?
+      `, [booking.timeslot_id]);
+
+      await connection.query(`
+        UPDATE applications
+        SET application_status = 'done'
+        WHERE id = ?
+      `, [booking.application_id]);
+
+      applicationMarkedDone = true;
+    }
+
+    // 7. Commit transaction
     await connection.commit();
     connection.release();
 
-    res.status(200).json({ message: 'Booking accepted, schedule and session created' });
+    // 8. Send notifications
+    const sessionDate = new Date(booking.session_date);
+    const formattedDate = sessionDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const studentMessage = `Your booking for ${formattedDate} has been accepted by ${booking.tutor_name}. Please be ready on your scheduled date.`;
+    const tutorMessage = `The booking of ${booking.student_name} on ${formattedDate} has been accepted.`;
+
+    await createNotification(booking.student_id, studentMessage);
+    await createNotification(booking.tutor_id, tutorMessage);
+
+    // 9. Optional notification for application completion
+    if (applicationMarkedDone) {
+      const succesMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`
+      await createNotification(booking.student_id, succesMessage);
+    }
+
+    res.status(200).json({
+      message: 'Booking accepted, schedule and session created'
+    });
 
   } catch (error) {
     if (connection) {
@@ -286,6 +347,8 @@ exports.acceptBooking = async (req, res) => {
   }
 };
 
+
+// Get bookings of a student
 exports.getBookingsByStudent = async (req, res) => {
   const studentId = req.params.studentId;
 
@@ -315,7 +378,7 @@ exports.getBookingsByStudent = async (req, res) => {
     JOIN packages p ON a.package_id = p.id
     LEFT JOIN bookings b ON a.id = b.application_id
 
-    WHERE a.student_id = ? AND application_status = 'approved'
+    WHERE a.student_id = ? AND application_status IN ('approved', 'done')
     ORDER BY a.created_at DESC, b.created_at DESC
     `, [studentId]);
 
@@ -325,12 +388,12 @@ exports.getBookingsByStudent = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
+// student cancel student booking
 exports.cancelBooking = async (req, res) => {
     const { bookingId } = req.params;
 
   try {
-    // Update the booking status to 'accepted'
+    // Update the booking status to 'Cancelled'
     const [result] = await db.query(`
       UPDATE bookings
       SET status = 'cancelled'
@@ -345,5 +408,91 @@ exports.cancelBooking = async (req, res) => {
   } catch (error) {
     console.error('Error accepting booking:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+// Tutor Cancel student booking
+exports.tutorBookingCancel = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { cancel_reason } = req.body;
+    const tutorId = req.user.id;
+
+    if (!cancel_reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cancellation reason is required'
+      });
+    }
+
+    // Fetch booking details
+    const [bookingCheck] = await db.query(
+      `SELECT b.id, b.status, b.tutor_id, b.student_id, b.session_date 
+       FROM bookings b
+       WHERE b.id = ?`,
+      [bookingId]
+    );
+
+    if (bookingCheck.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    const booking = bookingCheck[0];
+
+    if (booking.tutor_id !== tutorId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only cancel your own bookings'
+      });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending bookings can be cancelled by tutor'
+      });
+    }
+
+    // Cancel the booking
+    await db.query(
+      `UPDATE bookings SET status = 'cancelled' WHERE id = ?`,
+      [bookingId]
+    );
+
+    // Fetch tutor name
+    const [tutorResult] = await db.query(
+      `SELECT CONCAT(fname, ' ', lname) AS tutor_name FROM users WHERE id = ?`,
+      [tutorId]
+    );
+
+    const tutorName = tutorResult.length > 0 ? tutorResult[0].tutor_name : 'The tutor';
+
+    // Format scheduled_date using native Date methods
+    const dateObj = new Date(booking.session_date);
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const formattedDate = dateObj.toLocaleDateString('en-US', options);
+
+    // Send notification to student
+    const message = `Your tutor ${tutorName} has cancelled your booking scheduled on ${formattedDate}. Reason: ${cancel_reason}`;
+    await createNotification(booking.student_id, message);
+
+    // Send notification to tutor
+    const tutorMessage = `You cancelled a student booking on ${formattedDate}. Reason: ${cancel_reason}`;
+    await createNotification(booking.tutor_id, tutorMessage);
+
+    res.status(200).json({
+      success: true,
+      message: 'Booking cancelled successfully',
+      cancel_reason
+    });
+
+  } catch (error) {
+    console.error('Error cancelling booking:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel booking'
+    });
   }
 };

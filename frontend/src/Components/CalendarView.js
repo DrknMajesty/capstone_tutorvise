@@ -82,6 +82,9 @@ export default function CalendarView({ events, onReschedule }) {
                           Event
                         </th>
                         <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
+                          Tutorial Type
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
                           Start Time
                         </th>
                         <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
@@ -101,12 +104,17 @@ export default function CalendarView({ events, onReschedule }) {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm font-medium text-gray-900 capitalize">
+                              {event.type}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900 ">
                               {event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm font-medium text-gray-900 ">
                               {event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </td>
