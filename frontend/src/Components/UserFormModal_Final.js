@@ -94,7 +94,6 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
         className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <form onSubmit={handleSubmit} encType="multipart/form-data">
           <h3 className="text-lg font-semibold mb-4">
             {isEdit ? "Edit User Details" : "Create New User Account"}
           </h3>
