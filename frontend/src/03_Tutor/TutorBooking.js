@@ -27,16 +27,9 @@ const TutorBookingPage = () => {
       const res = await apiService.get(`/bookings/tutors/${tutorId}/bookings`);
       const bookingsData = res.data || [];
 
-      setBookings(prev => {
-        if (selectedBookingId) {
-          const updatedBooking = prev.find(b => b.booking_id === selectedBookingId);
-          if (updatedBooking) {
-            return bookingsData.map(b =>
-              b.booking_id === selectedBookingId ? updatedBooking : b
-            );
-          }
-        }
-        return bookingsData;
+      setBookings(current => {
+        const hasChanged = JSON.stringify(current) !== JSON.stringify(bookingsData);
+        return hasChanged ? bookingsData : current;
       });
     } catch (err) {
       console.error('Error fetching tutor bookings:', err);
@@ -44,23 +37,17 @@ const TutorBookingPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [tutorId, selectedBookingId]);
+  }, [tutorId]);
 
   const handleAccept = async (bookingId) => {
     try {
       await apiService.put(`/bookings/${bookingId}/confirm`);
-      setAlert({ message: 'Booking accepted', severity: 'success', show: true });
-
       setBookings(prev => prev.map(b =>
-        b.booking_id === bookingId ? { ...b, booking_status: 'accepted' } : b
+        b.booking_id === bookingId
+          ? { ...b, booking_status: 'accepted' }
+          : b
       ));
-
-      setSelectedBookingId(bookingId);
-
-      setTimeout(() => {
-        fetchBookings();
-        setSelectedBookingId(null);
-      }, 5000);
+      setAlert({ message: 'Booking accepted', severity: 'success', show: true });
     } catch (err) {
       console.error('Error accepting booking:', err);
       setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
@@ -80,23 +67,17 @@ const TutorBookingPage = () => {
         cancel_reason: cancelReason
       });
 
-      setAlert({
-        message: `Booking cancelled. Reason: ${cancelReason}`,
-        severity: 'info',
-        show: true
-      });
-
       setBookings(prev => prev.map(b =>
         b.booking_id === selectedBookingId
           ? { ...b, booking_status: 'cancelled', cancel_reason: cancelReason }
           : b
       ));
 
-      // const tempId = selectedBookingId;
-      setTimeout(() => {
-        fetchBookings();
-        setSelectedBookingId(null);
-      }, 5000);
+      setAlert({
+        message: `Booking cancelled. Reason: ${cancelReason}`,
+        severity: 'info',
+        show: true
+      });
     } catch (err) {
       console.error('Error cancelling booking:', err);
       setAlert({
@@ -107,6 +88,7 @@ const TutorBookingPage = () => {
     } finally {
       setCancelModalOpen(false);
       setCancelReason('');
+      setSelectedBookingId(null);
     }
   };
 
@@ -138,23 +120,21 @@ const TutorBookingPage = () => {
           {loading && <p className="text-center text-gray-600">Loading bookings...</p>}
           {error && <p className="text-center text-red-600">{error}</p>}
           {!loading && !error && (
-          <BookingList
-            bookings={bookings}
-            onAccept={handleAccept}
-            onCancel={handleCancelClick}
-            title="Student Bookings"
-            role="tutor"
-            selectedAppId={selectedAppId}
-            setSelectedAppId={setSelectedAppId}
-          />
+            <BookingList
+              bookings={bookings}
+              onAccept={handleAccept}
+              onCancel={handleCancelClick}
+              title="Student Bookings"
+              role="tutor"
+              selectedAppId={selectedAppId}
+              setSelectedAppId={setSelectedAppId}
+            />
           )}
         </div>
       </div>
 
       {alert.show && (
-        <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
-          fadeOut ? 'opacity-0' : 'opacity-100'
-        }`}>
+        <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}>
           <Alert
             severity={alert.severity}
             onClose={() => setAlert(prev => ({ ...prev, show: false }))}
