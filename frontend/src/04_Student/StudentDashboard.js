@@ -70,7 +70,7 @@ useEffect(() => {
       icon: <BookOpen className="text-blue-600" size={32} />,
       title: 'My Applications',
       description: 'Track submitted and approved applications.',
-      path: '/student/applications',
+      path: '/student/payments',
     },
     {
       icon: <CalendarCheck className="text-green-600" size={32} />,
