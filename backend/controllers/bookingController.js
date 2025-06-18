@@ -157,7 +157,7 @@ exports.getAllApplicationsWithBookings = async (req, res) => {
       JOIN packages p ON a.package_id = p.id
       LEFT JOIN bookings b ON a.id = b.application_id
 
-      WHERE a.application_status = 'Approved'
+      WHERE a.application_status IN ('Approved', 'Done')
 
       ORDER BY a.created_at DESC, b.created_at DESC
     `);
@@ -199,7 +199,7 @@ exports.getBookingsForTutor = async (req, res) => {
     JOIN packages p ON a.package_id = p.id
     LEFT JOIN bookings b ON a.id = b.application_id
 
-    WHERE a.tutor_id = ? AND a.application_status = 'Approved'
+    WHERE a.tutor_id = ? AND a.application_status IN ('Approved', 'Done')
     ORDER BY a.created_at DESC, b.session_date ASC
     `, [tutorId]);
 
@@ -378,7 +378,7 @@ exports.getBookingsByStudent = async (req, res) => {
     JOIN packages p ON a.package_id = p.id
     LEFT JOIN bookings b ON a.id = b.application_id
 
-    WHERE a.student_id = ? AND application_status = 'approved'
+    WHERE a.student_id = ? AND application_status IN ('approved', 'done')
     ORDER BY a.created_at DESC, b.created_at DESC
     `, [studentId]);
 

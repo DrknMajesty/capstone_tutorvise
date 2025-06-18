@@ -378,8 +378,8 @@ exports.getMyApplications = async (req, res) => {
   JOIN users t ON a.tutor_id = t.id
   LEFT JOIN payments pay ON pay.application_id = a.id
 
-  WHERE a.student_id = 2
-    AND a.application_status IN ('Approved')
+  WHERE a.student_id = ?
+    AND a.application_status IN ('Approved', 'Done')
 
   ORDER BY a.submitted_at DESC;
     `, [studentId]);

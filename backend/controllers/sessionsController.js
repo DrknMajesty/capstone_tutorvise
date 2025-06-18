@@ -1,4 +1,5 @@
 const db = require('../db');
+const { createNotification } = require('../utils/notification'); // adjust path if needed
 
 // GET /api/sessions
 exports.getAllSessions = async (req, res) => {
@@ -54,6 +55,65 @@ exports.updateSessionStatus = async (req, res) => {
   } catch (err) {
     console.error('Error updating session status:', err);
     res.status(500).json({ error: 'Failed to update session status' });
+  }
+};
+// Tutor request for status update
+exports.requestStatusUpdate = async (req, res) => {
+  console.log('🚨 [Manual Status Request] Controller triggered');
+
+  const { id } = req.params;
+  const sessionId = parseInt(id, 10);
+  const { status } = req.body;
+
+  console.log('Request Params:', { id: sessionId, status });
+
+  if (isNaN(sessionId) || !status) {
+    return res.status(400).json({ error: 'Invalid session ID or missing status' });
+  }
+
+  try {
+    const [[session]] = await db.query(`
+      SELECT s.id, s.schedule_id, sch.student_id, sch.tutor_id, sch.scheduled_date,
+             CONCAT(u.fname, ' ', u.lname) AS tutor_name
+      FROM sessions s
+      JOIN schedules sch ON s.schedule_id = sch.id
+      JOIN users u ON sch.tutor_id = u.id
+      WHERE s.id = ?
+    `, [sessionId]);
+
+    if (!session) {
+      console.log('❌ Session not found');
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const { tutor_id, tutor_name, scheduled_date } = session;
+
+    const [admins] = await db.query(`
+      SELECT id FROM users WHERE account_type = 'admin' AND status = 'active'
+    `);
+
+    // Respond immediately
+    res.json({ message: 'Request to update session status has been sent to admins.' });
+
+    // Notify in background
+    setImmediate(async () => {
+      const messageToAdmins = `Tutor ${tutor_name} requested to update session ID ${sessionId} to "${status}".`;
+      const messageToTutor = `Your request to update session on ${scheduled_date} to "${status}" has been sent.`;
+
+      for (const admin of admins) {
+        await createNotification(admin.id, messageToAdmins);
+      }
+
+      await createNotification(tutor_id, messageToTutor);
+
+      console.log(`✅ Notifications sent to ${admins.length} admin(s) and tutor ID ${tutor_id}`);
+    });
+
+  } catch (err) {
+    console.error('❌ Error sending session status request:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to send request for status update' });
+    }
   }
 };
 

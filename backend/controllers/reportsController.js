@@ -77,7 +77,7 @@ exports.getFinanceReport = async (req, res) => {
     FROM applications a
     JOIN packages p ON a.package_id = p.id
     JOIN users s ON a.student_id = s.id
-    WHERE a.application_status IN ('Approved', 'Submitted')
+    WHERE a.application_status IN ('Approved', 'Submitted', 'Done')
     `;
 
     const params = [];
@@ -90,7 +90,7 @@ exports.getFinanceReport = async (req, res) => {
     console.log('Fetched applications:', apps);
 
   const income = apps
-    .filter(a => a.application_status.toLowerCase() === 'approved')
+    .filter(a => ['approved', 'done'].includes(a.application_status.toLowerCase()))
     .reduce((sum, a) => sum + parseFloat(a.total_price || 0), 0);
 
   const receivables = apps

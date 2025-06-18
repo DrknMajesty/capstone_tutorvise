@@ -11,6 +11,8 @@ router.get('/', authenticateToken, sessionController.getAllSessions);
 // Update session status
 router.put('/:id/status', authenticateToken, sessionController.updateSessionStatus);
 
+router.put('/:id/status/request', authenticateToken, sessionController.requestStatusUpdate);
+
 // Get session status update logs (optional)
 router.get('/logs', authenticateToken, sessionController.getSessionLogs);
 

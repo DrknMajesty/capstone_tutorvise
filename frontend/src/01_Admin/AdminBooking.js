@@ -10,28 +10,28 @@ const AdminBooking = () => {
   const [error, setError] = useState(null);
   const [alert, setAlert] = useState({ message: '', severity: '', show: false });
   const [fadeOut, setFadeOut] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState(''); // ➕ Added
 
-    const fetchBookings = async () => {
+  const fetchBookings = async () => {
     setLoading(true);
     setError(null);
     try {
-        const res = await apiService.get('/bookings/all-bookings');
-        const bookingsData = res.data || [];
-        setBookings(bookingsData);
-        console.log('Fetched bookings:', bookingsData); // 🔍 Debug log
+      const res = await apiService.get('/bookings/all-bookings');
+      const bookingsData = res.data || [];
+      setBookings(bookingsData);
+      console.log('Fetched bookings:', bookingsData);
     } catch (err) {
-        setError('Failed to fetch bookings.');
+      setError('Failed to fetch bookings.');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
-
+  };
 
   const handleAccept = async (bookingId) => {
     try {
       await apiService.put(`/bookings/${bookingId}/confirm`);
       setAlert({ message: 'Booking Accepted.', severity: 'success', show: true });
-      fetchBookings();
+      fetchBookings(); // Refetch without resetting selected application
     } catch (err) {
       setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
     }
@@ -43,17 +43,12 @@ const AdminBooking = () => {
 
   useEffect(() => {
     if (alert.show) {
-      // Start fade-out after 3.5s
-      const fadeTimer = setTimeout(() => {
-        setFadeOut(true);
-      }, 3500);
-  
-        // Fully hide after fade ends (e.g., 500ms later)
+      const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
       const hideTimer = setTimeout(() => {
-      setAlert({ ...alert, show: false });
-        setFadeOut(false); // reset
+        setAlert({ ...alert, show: false });
+        setFadeOut(false);
       }, 4000);
-      
+
       return () => {
         clearTimeout(fadeTimer);
         clearTimeout(hideTimer);
@@ -64,7 +59,7 @@ const AdminBooking = () => {
   return (
     <>
       <ResponsiveNavbar />
-      <div className="h-24" /> {/* Spacer Div */}
+      <div className="h-24" />
       <div className="items-center justify-center flex flex-col">
         <div className="max-w-6xl mx-auto mt-10 p-4 w-full">
           <h2 className="text-2xl font-bold mb-4">Booking Management</h2>
@@ -75,7 +70,9 @@ const AdminBooking = () => {
               bookings={bookings}
               onAccept={handleAccept}
               title="All Bookings"
-              role="admin" // ← must be exactly this
+              role="admin"
+              selectedAppId={selectedAppId}      
+              setSelectedAppId={setSelectedAppId} 
             />
           )}
         </div>
@@ -84,7 +81,7 @@ const AdminBooking = () => {
       {alert.show && (
         <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
           fadeOut ? 'opacity-0' : 'opacity-100'
-          }`}
+        }`}
         >
           <Alert
             severity={alert.severity}

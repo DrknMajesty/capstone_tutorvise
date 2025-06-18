@@ -25,8 +25,8 @@ const TutorSessionsPage = () => {
 
   const autoUpdateSessionStatus = useCallback(() => {
     const now = new Date();
-    setSessions(prevSessions =>
-      prevSessions.map(session => {
+    setSessions(prev =>
+      prev.map(session => {
         const sessionDate = new Date(session.scheduled_date);
         const start = new Date(sessionDate);
         const end = new Date(sessionDate);
@@ -39,9 +39,7 @@ const TutorSessionsPage = () => {
         if (
           now >= start &&
           now < end &&
-          session.status !== 'ongoing' &&
-          session.status !== 'confirmed' &&
-          session.status !== 'missed'
+          !['ongoing', 'confirmed', 'missed'].includes(session.status)
         ) {
           updateStatusOnServer(session.session_id, 'ongoing');
           return { ...session, status: 'ongoing' };
@@ -49,9 +47,7 @@ const TutorSessionsPage = () => {
 
         if (
           now >= end &&
-          session.status !== 'completed' &&
-          session.status !== 'confirmed' &&
-          session.status !== 'missed'
+          !['completed', 'confirmed', 'missed'].includes(session.status)
         ) {
           updateStatusOnServer(session.session_id, 'completed');
           return { ...session, status: 'completed' };
@@ -87,9 +83,7 @@ const TutorSessionsPage = () => {
     }
   };
 
-  const handleDateChange = (e) => {
-    setSelectedDate(e.target.value);
-  };
+  const handleDateChange = (e) => setSelectedDate(e.target.value);
 
   const handleStatusChange = (id, status) => {
     setStatusUpdates(prev => ({ ...prev, [id]: status }));
@@ -98,16 +92,19 @@ const TutorSessionsPage = () => {
   const saveStatus = async (id) => {
     const session = sessions.find(s => s.session_id === id);
     const status = statusUpdates[id];
+
     if (!status || session.status !== 'completed') return;
+
     try {
-      await apiService.put(`/sessions/${id}/status`, { status });
+      await apiService.put(`/sessions/${id}/status/request`, { status });
+
       setSessions(prev =>
         prev.map(session =>
           session.session_id === id ? { ...session, status } : session
         )
       );
     } catch (err) {
-      console.error('Failed to update session status:', err);
+      console.error('Failed to update session status:', err.response?.data || err.message);
     }
   };
 
