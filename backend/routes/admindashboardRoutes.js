@@ -9,7 +9,7 @@ router.get('/summary', async (req, res) => {
     const [[{ totalUsers }]] = await db.query(`SELECT COUNT(*) AS totalUsers FROM users WHERE status = 'active'`);
     const [[{ students }]] = await db.query(`SELECT COUNT(*) AS students FROM users WHERE account_type = 'Student' AND status = 'active'`);
     const [[{ tutors }]] = await db.query(`SELECT COUNT(*) AS tutors FROM users WHERE account_type = 'Tutor' AND status = 'active'`);
-    const [[{ adminStaff }]] = await db.query(`SELECT COUNT(*) AS adminStaff FROM users WHERE account_type = 'Admin' AND status = 'active'`);
+    const [[{ adminStaff }]] = await db.query(`SELECT COUNT(*) AS adminStaff FROM users WHERE account_type = 'admin staff' AND status = 'active'`);
 
     // Applications by status
     const [applicationCounts] = await db.query(`

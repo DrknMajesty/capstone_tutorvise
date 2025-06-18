@@ -21,6 +21,14 @@ import AdminScheduleManagement from './01_Admin/AdminSchedules';
 import AdminSessionManagement from './01_Admin/AdminSessions';
 import AdminReportsManagement from './01_Admin/AdminReports';
 
+// Admin Staff Routes
+import StaffDashboard from './02_Admin Staff/StaffDashboard';
+import StaffProfile from './02_Admin Staff/StaffProfile';
+import StaffUserPage from './02_Admin Staff/StaffUser';
+import StaffPackagePage from './02_Admin Staff/StaffPackage';
+import StaffSchedulesPage from './02_Admin Staff/StaffSchedules';
+import StaffSessionsPage from './02_Admin Staff/StaffSession';
+
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
 import StudentDashboard from './04_Student/StudentDashboard';
@@ -49,7 +57,7 @@ function App() {
 
         {/* Admin Routes */}
         <Route 
-          element={<ProtectedRoute allowed_type="admin" />}
+        element={<ProtectedRoute allowed_type={'admin'} />}
         >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/profile" element={<AdminProfile />} />
@@ -61,6 +69,17 @@ function App() {
           <Route path="/admin/schedules" element={<AdminScheduleManagement />} />
           <Route path="/admin/sessions" element={<AdminSessionManagement />} />
           <Route path="/admin/reports" element={<AdminReportsManagement />} />
+        </Route>
+        {/* Admin Staff */}
+        <Route 
+        element={<ProtectedRoute allowed_type={'admin staff'} />}
+        >
+          <Route path="/admin-staff/dashboard" element={<StaffDashboard />} />
+          <Route path="/admin-staff/users" element={<StaffUserPage/>} />
+          <Route path="/admin-staff/profile" element={<StaffProfile />} />
+          <Route path="/admin-staff/packages" element={<StaffPackagePage />} />
+          <Route path="/admin-staff/schedules" element={<StaffSchedulesPage />} />
+          <Route path="/admin-staff/sessions" element={<StaffSessionsPage/>} />
         </Route>
 
         {/* Student Routes */}

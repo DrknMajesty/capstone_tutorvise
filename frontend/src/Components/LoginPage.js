@@ -25,6 +25,9 @@ const LoginPage = () => {
           case 'admin':
             navigate('/admin/dashboard');
             break;
+          case 'admin staff':
+            navigate('/admin-staff/dashboard');
+            break;  
           case 'student':
             navigate('/student/dashboard');
             break;

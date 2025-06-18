@@ -1,11 +1,24 @@
-// components/UserFormModal.js
+// components/UserFormModal_Final.js
 import React, { useState, useEffect, useRef } from "react";
 import FloatingField from "../Components/FloatingFields";
 
 const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = false }) => {
+  const currentUser = sessionStorage.getItem("account_type");
   const [previewImage, setPreviewImage] = useState(null);
   const [passwordError, setPasswordError] = useState("");
+  const [skipPasswordUpdate, setSkipPasswordUpdate] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Account type options based on user role
+  const accountTypeOptions = [
+    { value: "", label: "Select Account Type" },
+    { value: "student", label: "Student" },
+    { value: "tutor", label: "Tutor" },
+    ...(currentUser === "admin" ? [
+      { value: "admin staff", label: "Admin Staff" },
+      { value: "admin", label: "Admin" }
+    ] : [])
+  ];
 
   const handleChange = (e) => {
     const { name, type, value, files } = e.target;
@@ -26,7 +39,16 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Only validate passwords if creating new user or changing password
+    // Skip password validation if user chooses to keep current password
+    if (isEdit && skipPasswordUpdate) {
+      // Remove password fields from formData before submission
+      const { password, confirmPassword, ...dataToSubmit } = formData;
+      setFormData(dataToSubmit);
+      onSubmit(e);
+      return;
+    }
+
+    // Validate passwords if creating new user or changing password
     if (!isEdit || (isEdit && (formData.password || formData.confirmPassword))) {
       if (formData.password !== formData.confirmPassword) {
         setPasswordError("Passwords do not match");
@@ -73,7 +95,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
       >
         <form onSubmit={handleSubmit} encType="multipart/form-data">
           <h3 className="text-lg font-semibold mb-4">
-            {isEdit ? "Edit User Details" : "New User Details"}
+            {isEdit ? "Edit User Details" : "Create New User Account"}
           </h3>
 
           {isEdit && (
@@ -133,22 +155,37 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               </>
             ) : (
               <>
-                <FloatingField
-                  name="password"
-                  type="password"
-                  label="New Password"
-                  value={formData.password ?? ""}
-                  onChange={handleChange}
-                  placeholder="Leave blank to keep current password"
-                />
-                <FloatingField
-                  name="confirmPassword"
-                  type="password"
-                  label="Confirm New Password"
-                  value={formData.confirmPassword ?? ""}
-                  onChange={handleChange}
-                  placeholder="Leave blank to keep current password"
-                />
+                <div className="col-span-2 flex items-center mb-2">
+                  <input
+                    type="checkbox"
+                    id="skipPasswordUpdate"
+                    checked={skipPasswordUpdate}
+                    onChange={(e) => setSkipPasswordUpdate(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <label htmlFor="skipPasswordUpdate">Keep current password</label>
+                </div>
+                
+                {!skipPasswordUpdate && (
+                  <>
+                    <FloatingField
+                      name="password"
+                      type="password"
+                      label="New Password"
+                      value={formData.password ?? ""}
+                      onChange={handleChange}
+                      placeholder="Leave blank to keep current password"
+                    />
+                    <FloatingField
+                      name="confirmPassword"
+                      type="password"
+                      label="Confirm New Password"
+                      value={formData.confirmPassword ?? ""}
+                      onChange={handleChange}
+                      placeholder="Leave blank to keep current password"
+                    />
+                  </>
+                )}
               </>
             )}
 
@@ -166,13 +203,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               onChange={handleChange}
               required
               disabled={isEdit}
-              options={[
-                { value: "", label: "Select a Account Type"},
-                { value: "student", label: "Student" },
-                { value: "tutor", label: "Tutor" },
-                { value: "admin staff", label: "Admin Staff" },
-                { value: "admin", label: "Admin" },
-              ]}
+              options={accountTypeOptions}
             />
             <FloatingField
               name="email"
@@ -341,7 +372,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               type="submit"
               className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             >
-              {isEdit ? "Update User" : "Save User"}
+              {isEdit ? "Update User" : "Create User"}
             </button>
           </div>
         </form>
