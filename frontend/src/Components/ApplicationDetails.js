@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import apiService from '../utils/apiService';
+import Alert from '@mui/material/Alert';
 
 const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
   const [paymentProof, setPaymentProof] = useState(null);
@@ -10,6 +11,9 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
 
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   const formatTime12h = (time) => {
     if (!time) return '';
@@ -32,7 +36,12 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!paymentProof) return alert("Please select a file.");
+    if (!paymentProof) return 
+    setAlert({
+      message: `Please select a file.`,
+      severity: 'warning',
+      show: true,
+    });
 
     const formData = new FormData();
     formData.append('payment_proof', paymentProof);
@@ -41,10 +50,18 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
       await apiService.post(`/applications/submit-proof/${application.id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      alert('Payment proof submitted. Waiting for admin approval.');
+      setAlert({
+        message: `Payment proof submitted. Waiting for admin approval.`,
+        severity: 'success',
+        show: true,
+      });
       fetchApplication();
     } catch (err) {
-      alert('Failed to submit payment proof.');
+      setAlert({
+        message: `Failed to submit payment proof.`,
+        severity: 'error',
+        show: true,
+      });
     }
   };
 
@@ -147,7 +164,11 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
 
   const handleSessionBooking = async () => {
     if (selectedDates.length === 0) {
-      return alert('Please select at least one date');
+      return setAlert({
+        message: `Please select at least one date`,
+        severity: 'warning',
+        show: true,
+      });
     }
 
     try {
@@ -155,13 +176,21 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
         application_id: application.id,
         dates: selectedDates
       });
-      alert('Sessions booked successfully!');
+      setAlert({
+        message: `Sessions booked successfully!`,
+        severity: 'success',
+        show: true,
+      });
       setShowCalendar(false);
       setSelectedDates([]);
       setSelectedWeekday(null);
       fetchApplication();
     } catch (err) {
-      alert('Failed to book sessions: ' + (err.response?.data?.message || ''));
+      setAlert({
+        message: `Failed to book sessions: ` + (err.response?.data?.message || ''),
+        severity: 'error',
+        show: true,
+      });
     }
   };
 
@@ -279,6 +308,20 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
     );
   }
 
+  useEffect(() => {
+    if (alert.show) {
+      const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+      const hideTimer = setTimeout(() => {
+        setAlert({ ...alert, show: false });
+        setFadeOut(false);
+      }, 4000);
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
+
   return (
     <div className="mt-4 w-full bg-white p-6 rounded-lg shadow-lg border border-gray-300">
       <h2 className="text-2xl font-bold text-green-600 mb-4">Application Details</h2>
@@ -327,6 +370,21 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
           </div>
         )}
       </div>
+            {alert.show && (
+              <div
+                className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+                  fadeOut ? 'opacity-0' : 'opacity-100'
+                }`}
+              >
+                <Alert
+                  severity={alert.severity}
+                  variant="filled"
+                  onClose={() => setAlert({ ...alert, show: false })}
+                >
+                  {alert.message}
+                </Alert>
+              </div>
+            )}
     </div>
   );
 };

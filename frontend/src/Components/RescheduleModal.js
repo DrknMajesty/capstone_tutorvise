@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import Alert from '@mui/material/Alert';
 
 export default function RescheduleModal({ event, isOpen, onClose, onSubmit }) {
   const [sessionDate, setSessionDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
 
-
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
+  
   // Reset state on modal close
   useEffect(() => {
     if (!isOpen) {
@@ -60,12 +63,29 @@ export default function RescheduleModal({ event, isOpen, onClose, onSubmit }) {
     e.preventDefault();
 
     if (endTime <= startTime) {
-      alert('End time must be after start time.');
+      setAlert({
+        message: 'End time must be after start time.',
+        severity: 'error',
+        show: true,
+      });
       return;
     }
 
     onSubmit(sessionDate, startTime, endTime);
   };
+      useEffect(() => {
+      if (alert.show) {
+        const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+        const hideTimer = setTimeout(() => {
+          setAlert({ ...alert, show: false });
+          setFadeOut(false);
+        }, 4000);
+        return () => {
+          clearTimeout(fadeTimer);
+          clearTimeout(hideTimer);
+        };
+      }
+    }, [alert]);
 
   if (!isOpen || !event) return null;
 
@@ -117,12 +137,9 @@ export default function RescheduleModal({ event, isOpen, onClose, onSubmit }) {
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
               required
+              readOnly
             />
           </div>
-
-          {endTime <= startTime && (
-            <p className="text-sm text-red-600 mb-2">End time must be after start time.</p>
-          )}
 
           <div className="flex justify-end space-x-2">
             <button
@@ -142,6 +159,21 @@ export default function RescheduleModal({ event, isOpen, onClose, onSubmit }) {
           </div>
         </form>
       </div>
+       {alert.show && (
+              <div
+                className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+                  fadeOut ? 'opacity-0' : 'opacity-100'
+                }`}
+              >
+                <Alert
+                  severity={alert.severity}
+                  variant="filled"
+                  onClose={() => setAlert({ ...alert, show: false })}
+                >
+                  {alert.message}
+                </Alert>
+              </div>
+            )}
     </div>
   );
 }
