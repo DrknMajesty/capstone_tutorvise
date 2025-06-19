@@ -1,18 +1,21 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
+import Alert from '@mui/material/Alert';
 
 const TutorSessionsPage = () => {
   const user_id = sessionStorage.getItem('user_id') || '';
   const [sessions, setSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [statusUpdates, setStatusUpdates] = useState({});
   const [modalInfo, setModalInfo] = useState({ open: false, sessionId: null, action: '' });
 
   const [viewMode, setViewMode] = useState('byDate');
   const [currentPage, setCurrentPage] = useState(1);
   const sessionsPerPage = 5;
+
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -85,32 +88,35 @@ const TutorSessionsPage = () => {
 
   const handleDateChange = (e) => setSelectedDate(e.target.value);
 
-  const handleStatusChange = (id, status) => {
-    setStatusUpdates(prev => ({ ...prev, [id]: status }));
-  };
-
-  const saveStatus = async (id) => {
-    const session = sessions.find(s => s.session_id === id);
-    const status = statusUpdates[id];
-
-    if (!status || session.status !== 'completed') return;
+  const confirmAction = async () => {
+    const { sessionId, action } = modalInfo;
 
     try {
-      await apiService.put(`/sessions/${id}/status/request`, { status });
+      const session = sessions.find(s => s.session_id === sessionId);
+      if (!session || session.status !== 'completed') return;
+
+      await apiService.put(`/sessions/${sessionId}/status/request`, { status: action });
 
       setSessions(prev =>
-        prev.map(session =>
-          session.session_id === id ? { ...session, status } : session
+        prev.map(s =>
+          s.session_id === sessionId ? { ...s, status: action } : s
         )
       );
+
+      setAlert({
+        message: `Status request: ${action} submitted.`,
+        severity: 'success',
+        show: true,
+      });
     } catch (err) {
       console.error('Failed to update session status:', err.response?.data || err.message);
+      setAlert({
+        message: 'Failed to submit status update request.',
+        severity: 'error',
+        show: true,
+      });
     }
-  };
 
-  const confirmAction = () => {
-    handleStatusChange(modalInfo.sessionId, modalInfo.action);
-    saveStatus(modalInfo.sessionId);
     setModalInfo({ open: false, sessionId: null, action: '' });
   };
 
@@ -182,6 +188,20 @@ const TutorSessionsPage = () => {
       </table>
     </div>
   );
+
+  useEffect(() => {
+    if (alert.show) {
+      const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+      const hideTimer = setTimeout(() => {
+        setAlert({ ...alert, show: false });
+        setFadeOut(false);
+      }, 4000);
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
 
   return (
     <div>
@@ -273,6 +293,22 @@ const TutorSessionsPage = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {alert.show && (
+        <div
+          className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+            fadeOut ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <Alert
+            severity={alert.severity}
+            variant="filled"
+            onClose={() => setAlert({ ...alert, show: false })}
+          >
+            {alert.message}
+          </Alert>
         </div>
       )}
     </div>

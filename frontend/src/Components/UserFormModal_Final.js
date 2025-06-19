@@ -6,7 +6,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
   const currentUser = sessionStorage.getItem("account_type");
   const [previewImage, setPreviewImage] = useState(null);
   const [passwordError, setPasswordError] = useState("");
-  const [skipPasswordUpdate, setSkipPasswordUpdate] = useState(false);
+  const [skipPasswordUpdate, setSkipPasswordUpdate] = useState(false); // eslint-disable-next-line
   const fileInputRef = useRef(null);
 
   // Account type options based on user role

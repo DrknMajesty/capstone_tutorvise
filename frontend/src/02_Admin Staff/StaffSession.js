@@ -2,16 +2,25 @@
 import React, { useEffect, useState } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
+import Alert from '@mui/material/Alert';
 
 const StaffSessionsPage = () => {
   const username = sessionStorage.getItem('username') || '';
   const [sessions, setSessions] = useState([]);
   const [sessionLogs, setSessionLogs] = useState([]);
   const [modalInfo, setModalInfo] = useState({ open: false, sessionId: null, status: '' });
+  const [userId, setUserId] = useState(null);
 
   const todayDate = new Date().toISOString().split('T')[0];
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
+    const id = sessionStorage.getItem('user_id');
+    if (!id) {
+      console.warn('⚠️ No user_id found in sessionStorage');
+    }
+    setUserId(id);
     fetchSessions();
     fetchSessionLogs();
     const interval = setInterval(fetchSessions, 60000);
@@ -39,19 +48,25 @@ const StaffSessionsPage = () => {
   const confirmStatusUpdate = async () => {
     const { sessionId, status } = modalInfo;
     try {
-      await apiService.put(`/sessions/${sessionId}/status`, { status });
+      await apiService.put(`/sessions/${sessionId}/status`, { 
+        status,
+        user_id: userId  
+      });
       setSessions(prev =>
         prev.map(session =>
           session.session_id === sessionId ? { ...session, status } : session
         )
       );
       fetchSessionLogs();
+      setAlert({ message: `Session marked as ${status}.`, severity: 'success', show: true });
     } catch (err) {
       console.error('Failed to update session status:', err);
+      setAlert({ message: 'Failed to update session status.', severity: 'error', show: true });
     } finally {
       setModalInfo({ open: false, sessionId: null, status: '' });
     }
   };
+
 
   const filteredSessions = sessions.filter(session => {
     const localDate = new Date(session.scheduled_date);
@@ -109,6 +124,21 @@ const StaffSessionsPage = () => {
       </table>
     </div>
   );
+
+  useEffect(() => {
+  if (alert.show) {
+    const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+    const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+      setFadeOut(false);
+    }, 4000);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }
+}, [alert]);
+
 
   return (
     <div>
@@ -190,6 +220,19 @@ const StaffSessionsPage = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {alert.show && (
+        <div className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+          fadeOut ? 'opacity-0' : 'opacity-100'
+        }`}>
+          <Alert
+            severity={alert.severity}
+            variant="filled"
+            onClose={() => setAlert({ ...alert, show: false })}
+          >
+            {alert.message}
+          </Alert>
         </div>
       )}
     </div>

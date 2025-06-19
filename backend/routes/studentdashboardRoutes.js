@@ -28,7 +28,7 @@ router.get('/summary/:studentId', async (req, res) => {
       FROM sessions s 
       JOIN schedules sch ON s.schedule_id = sch.id
       WHERE sch.student_id = ? 
-      AND status = 'confirmed'
+      AND status IN ('confirmed', 'completed')
       `,
       [studentId]
     );

@@ -52,7 +52,7 @@ exports.updateSessionStatus = async (req, res) => {
       [status, id]
     );
 
-    // ✅ 2. Get session details
+    // ✅ 2. Get session details: tutor, student, and schedule info
     const [[sessionInfo]] = await db.query(`
       SELECT sch.tutor_id, sch.student_id, sch.scheduled_date, sch.start_time,
              CONCAT(tu.fname, ' ', tu.lname) AS tutor_name,
@@ -68,14 +68,7 @@ exports.updateSessionStatus = async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const {
-      tutor_id,
-      student_id,
-      scheduled_date,
-      start_time,
-      tutor_name,
-      student_name
-    } = sessionInfo;
+    const { tutor_id, student_id, scheduled_date, tutor_name, student_name } = sessionInfo;
 
     // ✅ 3. Get updater name
     const [[updater]] = await db.query(
@@ -84,28 +77,18 @@ exports.updateSessionStatus = async (req, res) => {
     );
     const updaterName = updater?.full_name || 'A staff member';
 
-    // ✅ 4. Format date and time
-    const formattedDate = new Date(scheduled_date).toLocaleDateString('en-PH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    // ✅ 4. Create personalized messages
+    const readableDate = new Date(scheduled_date).toLocaleString('en-PH', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
       timeZone: 'Asia/Manila'
     });
 
-    const [hour, minute] = start_time.split(':');
-    const dateForTime = new Date();
-    dateForTime.setHours(hour, minute);
-    const formattedTime = dateForTime.toLocaleTimeString('en-PH', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Manila'
-    });
+    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${readableDate} has been updated to status: "${status}" by ${updaterName}.`;
 
-    // ✅ 5. Notifications
-    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${formattedDate} at ${formattedTime} has been updated to "${status}" by ${updaterName}.`;
-    const updaterMessage = `You updated the session between ${tutor_name} and ${student_name} scheduled on ${formattedDate} at ${formattedTime} to "${status}".`;
+    const updaterMessage = `You updated the session between ${tutor_name} and ${student_name} scheduled on ${readableDate}, ${sessionInfo.start_time} to "${status}".`;
 
+    // ✅ 5. Send notifications
     await Promise.all([
       createNotification(user_id, updaterMessage),
       tutor_id !== user_id && createNotification(tutor_id, commonMessage),
@@ -119,6 +102,7 @@ exports.updateSessionStatus = async (req, res) => {
   }
 };
 
+// Tutor request for status update
 // Tutor request for status update
 exports.requestStatusUpdate = async (req, res) => {
   console.log('🚨 [Manual Status Request] Controller triggered');
@@ -135,8 +119,10 @@ exports.requestStatusUpdate = async (req, res) => {
 
   try {
     const [[session]] = await db.query(`
-      SELECT s.id, s.schedule_id, sch.student_id, sch.tutor_id, sch.scheduled_date,
-             CONCAT(u.fname, ' ', u.lname) AS tutor_name
+      SELECT 
+        s.id, s.schedule_id, sch.student_id, sch.tutor_id, 
+        sch.scheduled_date, sch.start_time, sch.end_time,
+        CONCAT(u.fname, ' ', u.lname) AS tutor_name
       FROM sessions s
       JOIN schedules sch ON s.schedule_id = sch.id
       JOIN users u ON sch.tutor_id = u.id
@@ -148,27 +134,33 @@ exports.requestStatusUpdate = async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const { tutor_id, tutor_name, scheduled_date } = session;
+    const { tutor_id, tutor_name, scheduled_date, start_time, end_time } = session;
 
     const [admins] = await db.query(`
       SELECT id FROM users WHERE account_type = 'admin' AND status = 'active'
     `);
+
+    // Format the schedule as "June 19, 2025 at 3:00 PM - 4:00 PM"
+    const formattedSchedule = formatScheduleMessage(scheduled_date, start_time, end_time);
 
     // Respond immediately
     res.json({ message: 'Request to update session status has been sent to admins.' });
 
     // Notify in background
     setImmediate(async () => {
-      const messageToAdmins = `Tutor ${tutor_name} requested to update session ID ${sessionId} to "${status}".`;
-      const messageToTutor = `Your request to update session on ${scheduled_date} to "${status}" has been sent.`;
+      const messageToAdmins = `Tutor ${tutor_name} requested to update the session on ${formattedSchedule} to "${status}".`;
+      const messageToTutor = `Your request to update the session on ${formattedSchedule} to "${status}" has been sent.`;
 
-      for (const admin of admins) {
-        await createNotification(admin.id, messageToAdmins);
+      try {
+        for (const admin of admins) {
+          await createNotification(admin.id, messageToAdmins);
+        }
+
+        await createNotification(tutor_id, messageToTutor);
+        console.log(`✅ Notifications sent to ${admins.length} admin(s) and tutor ID ${tutor_id}`);
+      } catch (notifyErr) {
+        console.error('❌ Notification error:', notifyErr);
       }
-
-      await createNotification(tutor_id, messageToTutor);
-
-      console.log(`✅ Notifications sent to ${admins.length} admin(s) and tutor ID ${tutor_id}`);
     });
 
   } catch (err) {
@@ -178,6 +170,25 @@ exports.requestStatusUpdate = async (req, res) => {
     }
   }
 };
+
+// Utility function to format date + time
+function formatScheduleMessage(dateStr, startTime, endTime) {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  const dateObj = new Date(dateStr);
+  const formattedDate = dateObj.toLocaleDateString('en-US', options);
+
+  const formatTime = (timeStr) => {
+    const [h, m] = timeStr.split(':');
+    const t = new Date();
+    t.setHours(h, m);
+    return t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const formattedStart = formatTime(startTime);
+  const formattedEnd = formatTime(endTime);
+
+  return `${formattedDate} from ${formattedStart} to ${formattedEnd}`;
+}
 
 // Get recent session status update logs (optional)
 exports.getSessionLogs = async (req, res) => {

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
+import Alert from '@mui/material/Alert';
 
 const AdminSessionsPage = () => {
   const username = sessionStorage.getItem('username') || '';
@@ -18,6 +19,10 @@ const AdminSessionsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [userId, setUserId] = useState(null);
+
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
+
 
   useEffect(() => {
     const id = sessionStorage.getItem('user_id');
@@ -59,25 +64,28 @@ const AdminSessionsPage = () => {
     }
   };
 
-  const confirmStatusUpdate = async () => {
-    const { sessionId, status } = modalInfo;
-    try {
-      await apiService.put(`/sessions/${sessionId}/status`, { 
-        status,
-        user_id: userId  
-      });
-      setSessions(prev =>
-        prev.map(session =>
-          session.session_id === sessionId ? { ...session, status } : session
-        )
-      );
-      fetchSessionLogs();
-    } catch (err) {
-      console.error('Failed to update session status:', err);
-    } finally {
-      setModalInfo({ open: false, sessionId: null, status: '' });
-    }
-  };
+const confirmStatusUpdate = async () => {
+  const { sessionId, status } = modalInfo;
+  try {
+    await apiService.put(`/sessions/${sessionId}/status`, { 
+      status,
+      user_id: userId  
+    });
+    setSessions(prev =>
+      prev.map(session =>
+        session.session_id === sessionId ? { ...session, status } : session
+      )
+    );
+    fetchSessionLogs();
+    setAlert({ message: `Session marked as ${status}.`, severity: 'success', show: true });
+  } catch (err) {
+    console.error('Failed to update session status:', err);
+    setAlert({ message: 'Failed to update session status.', severity: 'error', show: true });
+  } finally {
+    setModalInfo({ open: false, sessionId: null, status: '' });
+  }
+};
+
 
   const indexOfLast = currentPage * sessionsPerPage;
   const indexOfFirst = indexOfLast - sessionsPerPage;
@@ -139,6 +147,20 @@ const AdminSessionsPage = () => {
       </table>
     </div>
   );
+
+  useEffect(() => {
+  if (alert.show) {
+    const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+    const hideTimer = setTimeout(() => {
+      setAlert({ ...alert, show: false });
+      setFadeOut(false);
+    }, 4000);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }
+}, [alert]);
 
   return (
     <div>
@@ -288,6 +310,19 @@ const AdminSessionsPage = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {alert.show && (
+        <div className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+          fadeOut ? 'opacity-0' : 'opacity-100'
+        }`}>
+          <Alert
+            severity={alert.severity}
+            variant="filled"
+            onClose={() => setAlert({ ...alert, show: false })}
+          >
+            {alert.message}
+          </Alert>
         </div>
       )}
     </div>

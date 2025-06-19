@@ -3,6 +3,7 @@ import CalendarView from '../Components/CalendarView';
 import ResponsiveNavbar from '../Components/Navbar';
 import ApiService from '../utils/apiService';
 import RescheduleModal from '../Components/RescheduleModal';
+import Alert from '@mui/material/Alert';
 
 export default function StaffSchedulesPage() {
   const [events, setEvents] = useState([]);
@@ -11,6 +12,8 @@ export default function StaffSchedulesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userId, setUserId] = useState(null);
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
     const id = sessionStorage.getItem('user_id');
@@ -24,7 +27,7 @@ export default function StaffSchedulesPage() {
   async function fetchStaffSchedules() {
     setLoading(true);
     try {
-      const res = await ApiService.get('/schedules/all'); // Consider customizing for staff if needed
+      const res = await ApiService.get('/schedules/all');
       const data = res.data;
 
       const formattedEvents = data.map(schedule => {
@@ -86,7 +89,7 @@ export default function StaffSchedulesPage() {
     });
 
     if (conflict) {
-      alert('Conflict detected! Please choose a different time.');
+      setAlert({ message: 'Conflict detected! Please choose a different time.', severity: 'error', show: true });
       return;
     }
 
@@ -105,15 +108,30 @@ export default function StaffSchedulesPage() {
         end_time: newEnd,
       });
 
-      alert('Rescheduled successfully');
+      setAlert({ message: 'Rescheduled successfully.', severity: 'success', show: true });
       setModalOpen(false);
       setSelectedEvent(null);
       fetchStaffSchedules();
     } catch (err) {
       console.error('❌ Rescheduling failed:', err);
-      alert('Rescheduling failed.');
+      setAlert({ message: 'Rescheduling failed.', severity: 'error', show: true });
     }
   };
+
+  useEffect(() => {
+    if (alert.show) {
+      const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+      const hideTimer = setTimeout(() => {
+        setAlert({ ...alert, show: false });
+        setFadeOut(false);
+      }, 4000);
+
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
 
   return (
     <>
@@ -139,6 +157,21 @@ export default function StaffSchedulesPage() {
                 onClose={() => setModalOpen(false)}
                 onSubmit={handleModalSubmit}
               />
+              {alert.show && (
+                <div
+                  className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+                    fadeOut ? 'opacity-0' : 'opacity-100'
+                  }`}
+                >
+                  <Alert
+                    severity={alert.severity}
+                    onClose={() => setAlert({ ...alert, show: false })}
+                    variant="filled"
+                  >
+                    {alert.message}
+                  </Alert>
+                </div>
+              )}
             </>
           )}
         </div>
