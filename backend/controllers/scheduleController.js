@@ -26,12 +26,17 @@ FROM schedules
 JOIN users AS student ON schedules.student_id = student.id
 JOIN users AS tutor ON schedules.tutor_id = tutor.id
 
--- Follow the booking → application → package path
+-- Join booking → application → package path
 JOIN bookings ON schedules.booking_id = bookings.id
 JOIN applications ON bookings.application_id = applications.id
 JOIN packages ON applications.package_id = packages.id
 
+-- ✅ Join sessions and filter by 'upcoming'
+JOIN sessions ON sessions.schedule_id = schedules.id
+WHERE sessions.status = 'upcoming'
+
 ORDER BY schedules.scheduled_date, schedules.start_time;
+
     `);
 
     res.status(200).json(rows);
@@ -40,9 +45,11 @@ ORDER BY schedules.scheduled_date, schedules.start_time;
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 exports.rescheduleSchedule = async (req, res) => {
   const scheduleId = parseInt(req.params.id, 10);
-  const { scheduled_date, start_time, end_time } = req.body;
+  const { user_id, scheduled_date, start_time, end_time } = req.body;
+  console.log('🛠️ Received user_id:', user_id);
 
   if (!scheduled_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'scheduled_date, start_time, and end_time are required' });
@@ -132,10 +139,12 @@ exports.rescheduleSchedule = async (req, res) => {
       hour12: true
     });
 
+    const currentUserMsg = `You rescheduled a session of ${tutor_name} & ${student_name} to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`
     const studentMessage = `Your session with ${tutor_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
     const tutorMessage = `Your session with ${student_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
 
     // 5. Send notifications to student and tutor
+    await createNotification(user_id, currentUserMsg);
     await createNotification(student_id, studentMessage);
     await createNotification(tutor_id, tutorMessage);
 

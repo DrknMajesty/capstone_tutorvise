@@ -17,8 +17,14 @@ const AdminSessionsPage = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
+    const id = sessionStorage.getItem('user_id');
+    if (!id) {
+      console.warn('⚠️ No user_id found in sessionStorage');
+    }
+    setUserId(id);
     fetchSessions();
     fetchSessionLogs();
     const interval = setInterval(fetchSessions, 60000);
@@ -56,7 +62,10 @@ const AdminSessionsPage = () => {
   const confirmStatusUpdate = async () => {
     const { sessionId, status } = modalInfo;
     try {
-      await apiService.put(`/sessions/${sessionId}/status`, { status });
+      await apiService.put(`/sessions/${sessionId}/status`, { 
+        status,
+        user_id: userId  
+      });
       setSessions(prev =>
         prev.map(session =>
           session.session_id === sessionId ? { ...session, status } : session

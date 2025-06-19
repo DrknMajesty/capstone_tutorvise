@@ -10,15 +10,21 @@ export default function StaffSchedulesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
+    const id = sessionStorage.getItem('user_id');
+    if (!id) {
+      console.warn('⚠️ No user_id found in sessionStorage');
+    }
+    setUserId(id);
     fetchStaffSchedules();
   }, []);
 
   async function fetchStaffSchedules() {
     setLoading(true);
     try {
-      const res = await ApiService.get('/schedules/all'); // Customize this route in backend
+      const res = await ApiService.get('/schedules/all'); // Consider customizing for staff if needed
       const data = res.data;
 
       const formattedEvents = data.map(schedule => {
@@ -46,6 +52,7 @@ export default function StaffSchedulesPage() {
       });
       setEvents(formattedEvents);
     } catch (err) {
+      console.error('❌ Failed to load schedules:', err);
       setError('Failed to load schedules');
     } finally {
       setLoading(false);
@@ -84,7 +91,15 @@ export default function StaffSchedulesPage() {
     }
 
     try {
+      console.log('📤 Rescheduling with:', {
+        user_id: userId,
+        scheduled_date: newDate,
+        start_time: newStart,
+        end_time: newEnd
+      });
+
       await ApiService.put(`/schedules/${selectedEvent.id}`, {
+        user_id: userId,
         scheduled_date: newDate,
         start_time: newStart,
         end_time: newEnd,
@@ -95,6 +110,7 @@ export default function StaffSchedulesPage() {
       setSelectedEvent(null);
       fetchStaffSchedules();
     } catch (err) {
+      console.error('❌ Rescheduling failed:', err);
       alert('Rescheduling failed.');
     }
   };

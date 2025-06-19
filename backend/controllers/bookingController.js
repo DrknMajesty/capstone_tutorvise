@@ -217,7 +217,7 @@ exports.acceptBooking = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Fetch booking details including total_sessions and timeslot
+    // 1. Fetch booking details
     const [bookings] = await connection.query(`
       SELECT 
         bookings.*, 
@@ -245,6 +245,35 @@ exports.acceptBooking = async (req, res) => {
     }
 
     const booking = bookings[0];
+
+    // 1.5 Check for conflicting 'upcoming' sessions
+    const [conflicts] = await connection.query(`
+      SELECT sch.*
+      FROM schedules sch
+      JOIN sessions s ON s.schedule_id = sch.id
+      WHERE sch.tutor_id = ?
+        AND sch.scheduled_date = ?
+        AND s.status = 'upcoming'
+        AND (
+          (sch.start_time < ? AND sch.end_time > ?) OR
+          (sch.start_time < ? AND sch.end_time > ?) OR
+          (sch.start_time >= ? AND sch.end_time <= ?)
+        )
+    `, [
+      booking.tutor_id,
+      booking.session_date,
+      booking.snapshot_end_time, booking.snapshot_end_time,
+      booking.snapshot_start_time, booking.snapshot_start_time,
+      booking.snapshot_start_time, booking.snapshot_end_time
+    ]);
+
+    if (conflicts.length > 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(409).json({
+        error: 'Schedule conflict detected. The tutor already has an upcoming session at that time.'
+      });
+    }
 
     // 2. Update booking status
     const [updateResult] = await connection.query(`
@@ -288,10 +317,9 @@ exports.acceptBooking = async (req, res) => {
     `, [booking.application_id]);
 
     const acceptedCount = acceptedCountResult[0].accepted_count;
-
     let applicationMarkedDone = false;
 
-    // 6. If all sessions accepted, update timeslot and application
+    // 6. If all sessions accepted, mark timeslot and application as done
     if (acceptedCount === booking.total_sessions) {
       await connection.query(`
         UPDATE timeslots
@@ -315,10 +343,7 @@ exports.acceptBooking = async (req, res) => {
     // 8. Send notifications
     const sessionDate = new Date(booking.session_date);
     const formattedDate = sessionDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
 
     const studentMessage = `Your booking for ${formattedDate} has been accepted by ${booking.tutor_name}. Please be ready on your scheduled date.`;
@@ -327,9 +352,8 @@ exports.acceptBooking = async (req, res) => {
     await createNotification(booking.student_id, studentMessage);
     await createNotification(booking.tutor_id, tutorMessage);
 
-    // 9. Optional notification for application completion
     if (applicationMarkedDone) {
-      const succesMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`
+      const succesMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`;
       await createNotification(booking.student_id, succesMessage);
     }
 

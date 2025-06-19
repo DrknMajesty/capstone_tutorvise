@@ -43,20 +43,82 @@ exports.getSessionsByDate = async (req, res) => {
 // Update session status
 exports.updateSessionStatus = async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, user_id } = req.body;
 
   try {
+    // ✅ 1. Update the session status
     await db.query(
       'UPDATE sessions SET status = ?, updated_at = NOW() WHERE id = ?',
       [status, id]
     );
 
-    res.json({ message: 'Session status updated' });
+    // ✅ 2. Get session details
+    const [[sessionInfo]] = await db.query(`
+      SELECT sch.tutor_id, sch.student_id, sch.scheduled_date, sch.start_time,
+             CONCAT(tu.fname, ' ', tu.lname) AS tutor_name,
+             CONCAT(su.fname, ' ', su.lname) AS student_name
+      FROM sessions s
+      JOIN schedules sch ON s.schedule_id = sch.id
+      JOIN users tu ON sch.tutor_id = tu.id
+      JOIN users su ON sch.student_id = su.id
+      WHERE s.id = ?
+    `, [id]);
+
+    if (!sessionInfo) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const {
+      tutor_id,
+      student_id,
+      scheduled_date,
+      start_time,
+      tutor_name,
+      student_name
+    } = sessionInfo;
+
+    // ✅ 3. Get updater name
+    const [[updater]] = await db.query(
+      `SELECT CONCAT(fname, ' ', lname) AS full_name FROM users WHERE id = ?`,
+      [user_id]
+    );
+    const updaterName = updater?.full_name || 'A staff member';
+
+    // ✅ 4. Format date and time
+    const formattedDate = new Date(scheduled_date).toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'Asia/Manila'
+    });
+
+    const [hour, minute] = start_time.split(':');
+    const dateForTime = new Date();
+    dateForTime.setHours(hour, minute);
+    const formattedTime = dateForTime.toLocaleTimeString('en-PH', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Manila'
+    });
+
+    // ✅ 5. Notifications
+    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${formattedDate} at ${formattedTime} has been updated to "${status}" by ${updaterName}.`;
+    const updaterMessage = `You updated the session between ${tutor_name} and ${student_name} scheduled on ${formattedDate} at ${formattedTime} to "${status}".`;
+
+    await Promise.all([
+      createNotification(user_id, updaterMessage),
+      tutor_id !== user_id && createNotification(tutor_id, commonMessage),
+      student_id !== user_id && createNotification(student_id, commonMessage)
+    ]);
+
+    res.json({ message: 'Session status updated and notifications sent' });
   } catch (err) {
     console.error('Error updating session status:', err);
     res.status(500).json({ error: 'Failed to update session status' });
   }
 };
+
 // Tutor request for status update
 exports.requestStatusUpdate = async (req, res) => {
   console.log('🚨 [Manual Status Request] Controller triggered');

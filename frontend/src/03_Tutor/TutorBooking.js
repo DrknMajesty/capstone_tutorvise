@@ -39,20 +39,36 @@ const TutorBookingPage = () => {
     }
   }, [tutorId]);
 
-  const handleAccept = async (bookingId) => {
-    try {
-      await apiService.put(`/bookings/${bookingId}/confirm`);
-      setBookings(prev => prev.map(b =>
-        b.booking_id === bookingId
-          ? { ...b, booking_status: 'accepted' }
-          : b
-      ));
-      setAlert({ message: 'Booking accepted', severity: 'success', show: true });
-    } catch (err) {
-      console.error('Error accepting booking:', err);
-      setAlert({ message: 'Failed to accept booking.', severity: 'error', show: true });
+const handleAccept = async (bookingId) => {
+  try {
+    await apiService.put(`/bookings/${bookingId}/confirm`);
+    setBookings(prev => prev.map(b =>
+      b.booking_id === bookingId
+        ? { ...b, booking_status: 'accepted' }
+        : b
+    ));
+    setAlert({ message: 'Booking accepted', severity: 'success', show: true });
+  } catch (err) {
+    console.error('Error accepting booking:', err);
+    
+    const status = err.response?.status;
+    const msg = err.response?.data?.error || 'Failed to accept booking.';
+
+    if (status === 409) {
+      setAlert({
+        message: 'Booked schedule overlaps with existing schedules. Please cancel the booking.',
+        severity: 'warning',
+        show: true
+      });
+    } else {
+      setAlert({
+        message: msg,
+        severity: 'error',
+        show: true
+      });
     }
-  };
+  }
+};
 
   const handleCancelClick = (bookingId) => {
     setSelectedBookingId(bookingId);
