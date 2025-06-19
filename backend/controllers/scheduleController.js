@@ -33,7 +33,7 @@ JOIN packages ON applications.package_id = packages.id
 
 -- ✅ Join sessions and filter by 'upcoming'
 JOIN sessions ON sessions.schedule_id = schedules.id
-WHERE sessions.status = 'upcoming'
+WHERE sessions.status IN ('upcoming', 'completed')
 
 ORDER BY schedules.scheduled_date, schedules.start_time;
 
@@ -110,6 +110,13 @@ exports.rescheduleSchedule = async (req, res) => {
       SET scheduled_date = ?, start_time = ?, end_time = ?
       WHERE id = ?
     `, [scheduled_date, start_time, end_time, scheduleId]);
+
+    // 3.5. Update the corresponding session status to 'upcoming'
+    await db.query(`
+      UPDATE sessions
+      SET status = 'upcoming'
+      WHERE schedule_id = ?
+    `, [scheduleId]);
 
     // 4. Format message with 12-hour time
     const formattedDate = new Date(scheduled_date).toLocaleDateString('en-US', {

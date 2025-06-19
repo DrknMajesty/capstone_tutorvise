@@ -103,7 +103,6 @@ exports.updateSessionStatus = async (req, res) => {
 };
 
 // Tutor request for status update
-// Tutor request for status update
 exports.requestStatusUpdate = async (req, res) => {
   console.log('🚨 [Manual Status Request] Controller triggered');
 
