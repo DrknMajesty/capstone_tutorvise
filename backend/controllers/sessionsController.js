@@ -5,18 +5,25 @@ const { createNotification } = require('../utils/notification'); // adjust path 
 exports.getAllSessions = async (req, res) => {
   try {
     const [rows] = await db.execute(`
-      SELECT 
-        s.id AS session_id,
-        s.status,
-        sc.scheduled_date,
-        sc.start_time,
-        sc.end_time,
-        student.lname AS student_name,
-        tutor.lname AS tutor_name
-      FROM sessions s
-      JOIN schedules sc ON s.schedule_id = sc.id
-      JOIN users AS student ON sc.student_id = student.id
-      JOIN users AS tutor ON sc.tutor_id = tutor.id
+    SELECT 
+      s.id AS session_id,
+      s.status,
+      sc.scheduled_date,
+      sc.start_time,
+      sc.end_time,
+      student.lname AS student_name,
+      tutor.lname AS tutor_name,
+      packages.tutorial_type AS tutorial_type
+
+    FROM sessions s
+    JOIN schedules sc ON s.schedule_id = sc.id
+    JOIN users AS student ON sc.student_id = student.id
+    JOIN users AS tutor ON sc.tutor_id = tutor.id
+
+    -- ✅ Add the necessary joins to reach packages
+    JOIN bookings ON sc.booking_id = bookings.id
+    JOIN applications ON bookings.application_id = applications.id
+    JOIN packages ON applications.package_id = packages.id;
     `);
     res.json(rows);
   } catch (err) {
@@ -106,7 +113,7 @@ exports.updateSessionStatus = async (req, res) => {
     const statusFormatted = status.charAt(0).toUpperCase() + status.slice(1);
 
     // ✅ 5. Create notification messages
-    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${fullSchedule} has been updated to "${statusFormatted}" by ${updaterName}.`;
+    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${fullSchedule} has been updated to "${statusFormatted}"`;
     const updaterMessage = `You updated the session between ${tutor_name} and ${student_name} scheduled on ${fullSchedule} to "${statusFormatted}".`;
 
     // ✅ 6. Send notifications
@@ -246,23 +253,31 @@ exports.getSessionsByTutor = async (req, res) => {
   try {
     const [rows] = await db.query(
       `
-      SELECT 
-        s.id AS session_id,
-        s.status,
-        sc.scheduled_date,
-        sc.start_time,
-        sc.end_time,
-        student.lname AS student_name,
-        tutor.lname AS tutor_name,
-        f.rating,
-        f.comment
-      FROM sessions s
-      JOIN schedules sc ON s.schedule_id = sc.id
-      JOIN users AS student ON sc.student_id = student.id
-      JOIN users AS tutor ON sc.tutor_id = tutor.id
-      LEFT JOIN feedback f ON f.session_id = s.id
-      WHERE tutor.id = ?
-      ORDER BY sc.scheduled_date, sc.start_time
+SELECT 
+  s.id AS session_id,
+  s.status,
+  sc.scheduled_date,
+  sc.start_time,
+  sc.end_time,
+  student.lname AS student_name,
+  tutor.lname AS tutor_name,
+  f.rating,
+  f.comment,
+  packages.tutorial_type AS tutorial_type
+
+FROM sessions s
+JOIN schedules sc ON s.schedule_id = sc.id
+JOIN users AS student ON sc.student_id = student.id
+JOIN users AS tutor ON sc.tutor_id = tutor.id
+LEFT JOIN feedback f ON f.session_id = s.id
+
+-- ✅ Joins to reach the packages table
+JOIN bookings ON sc.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN packages ON applications.package_id = packages.id
+
+WHERE tutor.id = ?
+ORDER BY sc.scheduled_date, sc.start_time;
       `,
       [id]
     );
@@ -296,23 +311,31 @@ exports.getStudentSessions = async (req, res) => {
 
   try {
     const [rows] = await db.execute(`
-    SELECT 
-      s.id AS session_id,
-      s.status,
-      sc.scheduled_date,
-      sc.start_time,
-      sc.end_time,
-      student.lname AS student_name,
-      tutor.lname AS tutor_name,
-      f.rating,
-      f.comment
-    FROM sessions s
-    JOIN schedules sc ON s.schedule_id = sc.id
-    JOIN users AS student ON sc.student_id = student.id
-    JOIN users AS tutor ON sc.tutor_id = tutor.id
-    LEFT JOIN feedback f ON f.session_id = s.id
-    WHERE student.id = ?
-    ORDER BY sc.scheduled_date, sc.start_time;
+SELECT 
+  s.id AS session_id,
+  s.status,
+  sc.scheduled_date,
+  sc.start_time,
+  sc.end_time,
+  student.lname AS student_name,
+  tutor.lname AS tutor_name,
+  f.rating,
+  f.comment,
+  packages.tutorial_type AS tutorial_type
+
+FROM sessions s
+JOIN schedules sc ON s.schedule_id = sc.id
+JOIN users AS student ON sc.student_id = student.id
+JOIN users AS tutor ON sc.tutor_id = tutor.id
+LEFT JOIN feedback f ON f.session_id = s.id
+
+-- ✅ Joins to access tutorial_type
+JOIN bookings ON sc.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN packages ON applications.package_id = packages.id
+
+WHERE student.id = ?
+ORDER BY sc.scheduled_date, sc.start_time;
     `,  
       [studentId]
     );
