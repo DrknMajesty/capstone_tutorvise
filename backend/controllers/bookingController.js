@@ -101,9 +101,12 @@ exports.scheduleSessions = async (req, res) => {
   }
 
   try {
-    // Get student and tutor info from application
+    // Get student and tutor info with student's name from users table
     const [appRows] = await db.query(
-      'SELECT student_id, tutor_id FROM applications WHERE id = ?',
+      `SELECT a.student_id, a.tutor_id, u.fname, u.lname
+       FROM applications a
+       JOIN users u ON a.student_id = u.id
+       WHERE a.id = ?`,
       [application_id]
     );
 
@@ -111,7 +114,7 @@ exports.scheduleSessions = async (req, res) => {
       return res.status(404).json({ message: 'Application not found' });
     }
 
-    const { student_id, tutor_id } = appRows[0];
+    const { student_id, tutor_id, fname, lname } = appRows[0];
 
     // Insert each date as a new booking
     const values = dates.map(date => [application_id, student_id, tutor_id, date]);
@@ -122,12 +125,26 @@ exports.scheduleSessions = async (req, res) => {
       [values]
     );
 
+    // Create notifications for tutor and student
+    const sessionCount = dates.length;
+    const formattedDates = dates.map(date => new Date(date)).sort((a, b) => a - b);
+    const firstDate = formattedDates[0].toISOString().split('T')[0];
+    const lastDate = formattedDates[formattedDates.length - 1].toISOString().split('T')[0];
+
+    const tutorMsg = `You have ${sessionCount} new session${sessionCount > 1 ? 's' : ''} booked by ${fname} ${lname}, scheduled from ${firstDate} to ${lastDate}. Please check these in your booking page.`;
+    await createNotification(tutor_id, tutorMsg);
+
+    const studentMsg = `You have successfully booked ${sessionCount} session${sessionCount > 1 ? 's' : ''} with your tutor, scheduled from ${firstDate} to ${lastDate}. You may review them in your booking page.`;
+    await createNotification(student_id, studentMsg);
+
+
     return res.status(201).json({ message: 'Sessions booked successfully' });
   } catch (err) {
     console.error('Error booking sessions:', err);
     return res.status(500).json({ message: 'Failed to book sessions' });
   }
 };
+
 // Get Application with Bookings
 exports.getAllApplicationsWithBookings = async (req, res) => {
   try {
