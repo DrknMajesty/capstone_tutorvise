@@ -108,7 +108,7 @@ exports.getTutorProfileById = async (req, res) => {
 // Create a new user
 exports.createUser = async (req, res) => {
   const {
-    username, password, account_type,
+    username, password, account_type, gender, 
     fname, mname, lname, birthdate, email, contact_no,
     parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no,
     certification, teaching_lvl, subject, credentials, graduate_at, major
@@ -127,9 +127,9 @@ exports.createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const [userResult] = await db.query(
-      `INSERT INTO users (username, password, account_type, fname, mname, lname, birthdate, email, contact_no, profile_image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [username, hashedPassword, account_type, fname, mname || null, lname, birthdate, email || null, contact_no || null, profile_image]
+      `INSERT INTO users (username, password, account_type, gender, fname, mname, lname, birthdate, email, contact_no, profile_image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, hashedPassword, account_type, gender, fname, mname || null, lname, birthdate, email || null, contact_no || null, profile_image]
     );
 
     const userId = userResult.insertId;
