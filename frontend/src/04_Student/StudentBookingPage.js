@@ -271,7 +271,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
   const fetchApplication = useCallback(async () => {
     try {
       const res = await apiService.get(`/applications/my-applications/${userId}`);
-
+      console.log("Data:", res);
       if (!res.data) {
         setApplication(null);
         setHasExpired(false);
@@ -477,7 +477,8 @@ const handleWeekdaySelect = (weekdayIndex) => {
           <h2 className="text-2xl font-bold text-green-600 mb-4">Application Details</h2>
           <p><strong>Application ID:</strong> {application.id}</p>
           <p><strong>Package:</strong> {application.package_name}</p>
-          <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}</p>
+          <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname} {application.gender === "male" && <span title="Male">♂️</span>} {application.gender === "female" && <span title="Female">♀️</span>}    
+      </p>
           <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
           <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
           <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
@@ -613,7 +614,12 @@ const handleWeekdaySelect = (weekdayIndex) => {
         <h2 className="text-2xl font-bold text-green-600 mb-4">Application Details</h2>
         <p><strong>Application ID:</strong> {application.id}</p>
         <p><strong>Package:</strong> {application.package_name}</p>
-        <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}</p>
+        <p><strong>Tutor:</strong> 
+          {application.tutor_fname} 
+          {application.tutor_lname}
+          {application.gender === "male" && <span title="Male">♂️</span>}
+          {application.gender === "female" && <span title="Female">♀️</span>}    
+        </p>
         <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
         <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
         <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
@@ -774,7 +780,12 @@ const handleWeekdaySelect = (weekdayIndex) => {
                   />
                 )}
                 <div>
-                  <p><strong>Name:</strong> {selectedTutor.fname} {selectedTutor.lname}</p>
+                  <p className="flex items-center gap-1">
+                    <strong>Name:</strong>&nbsp;
+                    {selectedTutor.fname} {selectedTutor.lname}
+                    {selectedTutor.gender === "male" && <span title="Male">♂️</span>}
+                    {selectedTutor.gender === "female" && <span title="Female">♀️</span>}
+                  </p>
                   {selectedTutor.certification && <p><strong>Certification:</strong> {selectedTutor.certification}</p>}
                   {selectedTutor.subject && <p><strong>Subject Expertise:</strong> {selectedTutor.subject}</p>}
                   {selectedTutor.teaching_lvl && <p><strong>Academic Level:</strong> {selectedTutor.teaching_lvl}</p>}

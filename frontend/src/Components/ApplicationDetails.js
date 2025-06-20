@@ -327,7 +327,13 @@ const ApplicationDetails = ({ application, fetchApplication, hasExpired }) => {
       <h2 className="text-2xl font-bold text-green-600 mb-4">Application Details</h2>
       <p><strong>Application ID:</strong> {application.id}</p>
       <p><strong>Package:</strong> {application.package_name}</p>
-      <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}</p>
+      {/* <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}</p> */}
+      <p><strong>Tutor:</strong> 
+        {application.tutor_fname} 
+        {application.tutor_lname}
+        {application.gender === "male" && <span title="Male">♂️</span>}
+        {application.gender === "female" && <span title="Female">♀️</span>}    
+      </p>
       <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
       <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
       <p><strong>Date Applied:</strong> {application.created_at}</p>

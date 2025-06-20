@@ -292,6 +292,7 @@ exports.getActiveTutors = async (req, res) => {
       u.mname,
       u.lname,
       u.profile_image_url,
+      u.gender,
       tp.user_id,
       tp.certification,
       tp.teaching_lvl,
