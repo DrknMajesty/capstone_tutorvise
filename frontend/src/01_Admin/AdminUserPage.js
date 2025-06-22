@@ -19,7 +19,7 @@ const AdminUserPage = () => {
   const [fadeOut, setFadeOut] = useState(false);
   const [formData, setFormData] = useState({
     // Common Fields
-    username: '', password: '', account_type: '',
+    username: '', password: '', account_type: '', gender: '',
     fname: '', mname: '', lname: '', birthdate: '',
     email: '', contact_no: '', profile_image: null,
     // Student Fields
@@ -27,7 +27,7 @@ const AdminUserPage = () => {
     parent_suffix: '', parent_email: '', parent_contact_no: '',
     // Tutor Fields
     certification: '', teaching_lvl: '', subject: '',
-    credentials: '', graduate_at: '', major: '',
+    experiences: '', graduate_at: '', major: '',
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
@@ -46,6 +46,7 @@ const AdminUserPage = () => {
     try {
       const response = await apiService.get('/users/all');
       setUsers(response.data);
+      console.log("Data:", response.data);
     } catch (err) {
       setError('Failed to fetch users.');
     } finally {
@@ -76,13 +77,13 @@ const AdminUserPage = () => {
 
   const resetForm = () => {
     setFormData({
-      username: '', password: '', account_type: '',
+      username: '', password: '', account_type: '', gender: '',
       fname: '', mname: '', lname: '', birthdate: '',
       email: '', contact_no: '', profile_image: null,
       parent_fname: '', parent_mname: '', parent_lname: '',
       parent_suffix: '', parent_email: '', parent_contact_no: '',
       certification: '', teaching_lvl: '', subject: '',
-      credentials: '', graduate_at: '', major: '',
+      experiences: '', graduate_at: '', major: '',
     });
   };
 

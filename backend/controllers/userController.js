@@ -108,10 +108,10 @@ exports.getTutorProfileById = async (req, res) => {
 // Create a new user
 exports.createUser = async (req, res) => {
   const {
-    username, password, account_type,
+    username, password, account_type, gender, 
     fname, mname, lname, birthdate, email, contact_no,
     parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no,
-    certification, teaching_lvl, subject, credentials, graduate_at, major
+    certification, teaching_lvl, subject, experiences, graduate_at, major
   } = req.body;
 
   const profile_image = req.file ? req.file.filename : null;
@@ -127,9 +127,9 @@ exports.createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const [userResult] = await db.query(
-      `INSERT INTO users (username, password, account_type, fname, mname, lname, birthdate, email, contact_no, profile_image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [username, hashedPassword, account_type, fname, mname || null, lname, birthdate, email || null, contact_no || null, profile_image]
+      `INSERT INTO users (username, password, account_type, gender, fname, mname, lname, birthdate, email, contact_no, profile_image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, hashedPassword, account_type, gender, fname, mname || null, lname, birthdate, email || null, contact_no || null, profile_image]
     );
 
     const userId = userResult.insertId;
@@ -146,9 +146,9 @@ exports.createUser = async (req, res) => {
     // Tutor Profile
     if (account_type === 'tutor') {
       await db.query(
-        `INSERT INTO tutor_profile (user_id, certification, teaching_lvl, subject, credentials, graduate_at, major)
+        `INSERT INTO tutor_profile (user_id, certification, teaching_lvl, subject, experiences, graduate_at, major)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [userId, certification, teaching_lvl, subject, credentials, graduate_at, major]
+        [userId, certification, teaching_lvl, subject, experiences, graduate_at, major]
       );
     }
 
@@ -166,7 +166,7 @@ exports.updateUser = async (req, res) => {
     username, password, fname, mname, lname, birthdate, email, contact_no,
     account_type,
     parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no,
-    certification, teaching_lvl, subject, credentials, graduate_at, major
+    certification, teaching_lvl, subject, experiences, graduate_at, major
   } = req.body;
 
   const profile_image = req.file ? req.file.filename : null;
@@ -245,16 +245,16 @@ exports.updateUser = async (req, res) => {
       if (existingTutor.length > 0) {
         await db.query(
           `UPDATE tutor_profile SET
-            certification = ?, teaching_lvl = ?, subject = ?, credentials = ?, graduate_at = ?, major = ?
+            certification = ?, teaching_lvl = ?, subject = ?, experiences = ?, graduate_at = ?, major = ?
            WHERE user_id = ?`,
-          [certification, teaching_lvl, subject, credentials, graduate_at, major, userId]
+          [certification, teaching_lvl, subject, experiences, graduate_at, major, userId]
         );
       } else {
         await db.query(
           `INSERT INTO tutor_profile 
-            (user_id, certification, teaching_lvl, subject, credentials, graduate_at, major)
+            (user_id, certification, teaching_lvl, subject, experiences, graduate_at, major)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [userId, certification, teaching_lvl, subject, credentials, graduate_at, major]
+          [userId, certification, teaching_lvl, subject, experiences, graduate_at, major]
         );
       }
     }
@@ -285,25 +285,39 @@ exports.deleteUser = async (req, res) => {
 // Get Tutor Accounts
 exports.getActiveTutors = async (req, res) => {
   try {
-    const [users] = await db.query(
-    `SELECT 
-      u.id,
-      u.fname,
-      u.mname,
-      u.lname,
-      u.profile_image_url,
-      tp.user_id,
-      tp.certification,
-      tp.teaching_lvl,
-      tp.subject,
-      tp.credentials,
-      tp.graduate_at,
-      tp.major
-    FROM users AS u
-    LEFT JOIN tutor_profile AS tp ON u.id = tp.user_id
-    WHERE u.account_type = 'tutor' AND u.status = 'active'
-    ORDER BY tp.subject DESC`
-    );
+    const [users] = await db.query(`
+SELECT 
+  u.id,
+  u.fname,
+  u.mname,
+  u.lname,
+  u.profile_image_url,
+  u.gender,
+  tp.user_id,
+  tp.certification,
+  tp.teaching_lvl,
+  tp.subject,
+  tp.experiences,
+  tp.graduate_at,
+  tp.major,
+  ROUND(AVG(f.rating), 2) AS average_rating,
+  COUNT(f.rating) AS total_reviews
+FROM users AS u
+LEFT JOIN tutor_profile AS tp ON u.id = tp.user_id
+
+-- Join all the way to feedback
+LEFT JOIN applications a ON a.tutor_id = u.id
+LEFT JOIN bookings b ON b.application_id = a.id
+LEFT JOIN schedules s ON s.booking_id = b.id
+LEFT JOIN sessions sess ON sess.schedule_id = s.id
+LEFT JOIN feedback f ON f.session_id = sess.id
+
+WHERE u.account_type = 'tutor' AND u.status = 'active'
+GROUP BY 
+  u.id, u.fname, u.mname, u.lname, u.profile_image_url, u.gender,
+  tp.user_id, tp.certification, tp.teaching_lvl, tp.subject, tp.experiences, tp.graduate_at, tp.major
+ORDER BY tp.subject DESC;
+    `);
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);

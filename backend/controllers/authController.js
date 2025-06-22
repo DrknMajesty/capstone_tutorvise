@@ -10,12 +10,12 @@ const login = async (req, res) => {
   try {
     const user = await userModel.getUserByUsername(username);
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: 'Invalid experiences' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: 'Invalid experiences' });
     }
 
     const token = jwt.sign(

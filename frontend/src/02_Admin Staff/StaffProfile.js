@@ -16,6 +16,7 @@ const StaffProfile = () => {
     email: '',
     contact_no: '',
     birthdate: '',
+    gender: '',
   });
   const [passwordData, setPasswordData] = useState({
   oldPassword: '',
@@ -151,7 +152,14 @@ const StaffProfile = () => {
             )}
             <p><strong>ID:</strong> {userData.id}</p>
             <p><strong>Username:</strong> {userData.username}</p>
-            <p><strong>Fullname:</strong> {userData.lname}, {userData.fname} {abbreviateMiddleName(userData.mname)} {userData.suffix}</p>
+              <p><strong>Fullname:</strong> 
+                {userData.lname}, 
+                {userData.fname} 
+                {abbreviateMiddleName(userData.mname)} 
+                {userData.suffix}
+                {userData.gender === "male" && <span title="Male">♂️</span>}
+                {userData.gender === "female" && <span title="Female">♀️</span>}
+              </p>
             <p><strong>Email:</strong> {userData.email}</p>
             <p><strong>Contact No:</strong> {userData.contact_no}</p>
             <p><strong>Birthdate:</strong> {formatDate(userData.birthdate)}</p>

@@ -13,6 +13,7 @@ exports.getMyApplication = async (req, res) => {
         p.package_name, 
         p.price_package, 
         p.total_sessions,
+        t.gender,
         t.fname AS tutor_fname, 
         t.lname AS tutor_lname
       FROM applications a

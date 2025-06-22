@@ -19,6 +19,13 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
       { value: "admin", label: "Admin" }
     ] : [])
   ];
+
+  const genderOptions = [
+  { value: "", label: "Select Gender" },
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+];
+
   const [isChangePassword, setIsChangePassword] = useState(false);
 
   const handleChange = (e) => {
@@ -162,6 +169,20 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               required
               disabled={isEdit}
               options={accountTypeOptions}
+            />
+            <FloatingField
+              type="select"
+              name="gender"
+              label={
+                <span>
+                  Gender <span className="text-red-500">*</span>
+                </span>
+              }
+              value={formData.gender || ""}
+              onChange={handleChange}
+              required
+              disabled={isEdit}
+              options={genderOptions}
             />
             <FloatingField
               name="email"
@@ -391,14 +412,14 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
                 required
               />
               <FloatingField
-                name="credentials"
+                name="experiences"
                 type="text"
                 label={
                   <span>
-                    Credentials <span className="text-red-500">*</span>
+                    Experiences <span className="text-red-500">*</span>
                   </span>
                 }
-                value={formData.credentials || ""}
+                value={formData.experiences || ""}
                 onChange={handleChange}
                 required
               />

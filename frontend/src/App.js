@@ -6,7 +6,6 @@ import ProtectedRoute from './utils/protectedRoutes';
 import LandingPage from './Components/LandingPage'; // adjust path if needed
 import LoginPage from './Components/LoginPage';
 import Unauthorized from './utils/unauthorize';
-import TestPage from './Components/LearningCenterPage';
 
 //Admin Routes
 // import AdminUserPage from './01_Admin/AdminUserPage';
@@ -51,9 +50,6 @@ function App() {
         {/* Default route redirects to /login */}
         <Route path="/" element={< LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        
-        {/* Test Route */}
-        <Route path="/test" element={<TestPage/>}/>
 
         {/* Admin Routes */}
         <Route 

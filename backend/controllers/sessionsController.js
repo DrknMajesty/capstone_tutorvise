@@ -5,18 +5,25 @@ const { createNotification } = require('../utils/notification'); // adjust path 
 exports.getAllSessions = async (req, res) => {
   try {
     const [rows] = await db.execute(`
-      SELECT 
-        s.id AS session_id,
-        s.status,
-        sc.scheduled_date,
-        sc.start_time,
-        sc.end_time,
-        student.lname AS student_name,
-        tutor.lname AS tutor_name
-      FROM sessions s
-      JOIN schedules sc ON s.schedule_id = sc.id
-      JOIN users AS student ON sc.student_id = student.id
-      JOIN users AS tutor ON sc.tutor_id = tutor.id
+    SELECT 
+      s.id AS session_id,
+      s.status,
+      sc.scheduled_date,
+      sc.start_time,
+      sc.end_time,
+      student.lname AS student_name,
+      tutor.lname AS tutor_name,
+      packages.tutorial_type AS tutorial_type
+
+    FROM sessions s
+    JOIN schedules sc ON s.schedule_id = sc.id
+    JOIN users AS student ON sc.student_id = student.id
+    JOIN users AS tutor ON sc.tutor_id = tutor.id
+
+    -- ✅ Add the necessary joins to reach packages
+    JOIN bookings ON sc.booking_id = bookings.id
+    JOIN applications ON bookings.application_id = applications.id
+    JOIN packages ON applications.package_id = packages.id;
     `);
     res.json(rows);
   } catch (err) {
@@ -52,7 +59,7 @@ exports.updateSessionStatus = async (req, res) => {
       [status, id]
     );
 
-    // ✅ 2. Get session details: tutor, student, and schedule info
+    // ✅ 2. Get session details including names and schedule info
     const [[sessionInfo]] = await db.query(`
       SELECT sch.tutor_id, sch.student_id, sch.scheduled_date, sch.start_time,
              CONCAT(tu.fname, ' ', tu.lname) AS tutor_name,
@@ -68,34 +75,57 @@ exports.updateSessionStatus = async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const { tutor_id, student_id, scheduled_date, tutor_name, student_name } = sessionInfo;
+    const { tutor_id, student_id, scheduled_date, start_time, tutor_name, student_name } = sessionInfo;
 
-    // ✅ 3. Get updater name
+    // ✅ 3. Get the name of the user who updated the status
     const [[updater]] = await db.query(
       `SELECT CONCAT(fname, ' ', lname) AS full_name FROM users WHERE id = ?`,
       [user_id]
     );
     const updaterName = updater?.full_name || 'A staff member';
 
-    // ✅ 4. Create personalized messages
-    const readableDate = new Date(scheduled_date).toLocaleString('en-PH', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
+    // ✅ 4. Format readable date and time
+    const readableDate = new Date(scheduled_date).toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
       timeZone: 'Asia/Manila'
     });
 
-    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${readableDate} has been updated to status: "${status}" by ${updaterName}.`;
+    let readableTime = 'N/A';
+    if (scheduled_date && start_time) {
+      const datePart = new Date(scheduled_date).toISOString().split('T')[0]; // "YYYY-MM-DD"
+      const combinedDateTime = new Date(`${datePart}T${start_time}`); // full ISO datetime
 
-    const updaterMessage = `You updated the session between ${tutor_name} and ${student_name} scheduled on ${readableDate}, ${sessionInfo.start_time} to "${status}".`;
+      if (!isNaN(combinedDateTime)) {
+        readableTime = combinedDateTime.toLocaleTimeString('en-PH', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Manila'
+        });
+      } else {
+        console.warn(`⚠️ Invalid dateTime: ${datePart}T${start_time}`);
+      }
+    }
 
-    // ✅ 5. Send notifications
+    const fullSchedule = `${readableDate} at ${readableTime}`;
+    const statusFormatted = status.charAt(0).toUpperCase() + status.slice(1);
+
+    // ✅ 5. Create notification messages
+    const commonMessage = `The session between ${tutor_name} and ${student_name} scheduled on ${fullSchedule} has been updated to "${statusFormatted}"`;
+    const updaterMessage = `You updated the session between ${tutor_name} and ${student_name} scheduled on ${fullSchedule} to "${statusFormatted}".`;
+
+    // ✅ 6. Send notifications
     await Promise.all([
       createNotification(user_id, updaterMessage),
       tutor_id !== user_id && createNotification(tutor_id, commonMessage),
       student_id !== user_id && createNotification(student_id, commonMessage)
     ]);
 
+    // ✅ 7. Return success response
     res.json({ message: 'Session status updated and notifications sent' });
+
   } catch (err) {
     console.error('Error updating session status:', err);
     res.status(500).json({ error: 'Failed to update session status' });
@@ -223,23 +253,31 @@ exports.getSessionsByTutor = async (req, res) => {
   try {
     const [rows] = await db.query(
       `
-      SELECT 
-        s.id AS session_id,
-        s.status,
-        sc.scheduled_date,
-        sc.start_time,
-        sc.end_time,
-        student.lname AS student_name,
-        tutor.lname AS tutor_name,
-        f.rating,
-        f.comment
-      FROM sessions s
-      JOIN schedules sc ON s.schedule_id = sc.id
-      JOIN users AS student ON sc.student_id = student.id
-      JOIN users AS tutor ON sc.tutor_id = tutor.id
-      LEFT JOIN feedback f ON f.session_id = s.id
-      WHERE tutor.id = ?
-      ORDER BY sc.scheduled_date, sc.start_time
+SELECT 
+  s.id AS session_id,
+  s.status,
+  sc.scheduled_date,
+  sc.start_time,
+  sc.end_time,
+  student.lname AS student_name,
+  tutor.lname AS tutor_name,
+  f.rating,
+  f.comment,
+  packages.tutorial_type AS tutorial_type
+
+FROM sessions s
+JOIN schedules sc ON s.schedule_id = sc.id
+JOIN users AS student ON sc.student_id = student.id
+JOIN users AS tutor ON sc.tutor_id = tutor.id
+LEFT JOIN feedback f ON f.session_id = s.id
+
+-- ✅ Joins to reach the packages table
+JOIN bookings ON sc.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN packages ON applications.package_id = packages.id
+
+WHERE tutor.id = ?
+ORDER BY sc.scheduled_date, sc.start_time;
       `,
       [id]
     );
@@ -273,23 +311,31 @@ exports.getStudentSessions = async (req, res) => {
 
   try {
     const [rows] = await db.execute(`
-    SELECT 
-      s.id AS session_id,
-      s.status,
-      sc.scheduled_date,
-      sc.start_time,
-      sc.end_time,
-      student.lname AS student_name,
-      tutor.lname AS tutor_name,
-      f.rating,
-      f.comment
-    FROM sessions s
-    JOIN schedules sc ON s.schedule_id = sc.id
-    JOIN users AS student ON sc.student_id = student.id
-    JOIN users AS tutor ON sc.tutor_id = tutor.id
-    LEFT JOIN feedback f ON f.session_id = s.id
-    WHERE student.id = ?
-    ORDER BY sc.scheduled_date, sc.start_time;
+SELECT 
+  s.id AS session_id,
+  s.status,
+  sc.scheduled_date,
+  sc.start_time,
+  sc.end_time,
+  student.lname AS student_name,
+  tutor.lname AS tutor_name,
+  f.rating,
+  f.comment,
+  packages.tutorial_type AS tutorial_type
+
+FROM sessions s
+JOIN schedules sc ON s.schedule_id = sc.id
+JOIN users AS student ON sc.student_id = student.id
+JOIN users AS tutor ON sc.tutor_id = tutor.id
+LEFT JOIN feedback f ON f.session_id = s.id
+
+-- ✅ Joins to access tutorial_type
+JOIN bookings ON sc.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN packages ON applications.package_id = packages.id
+
+WHERE student.id = ?
+ORDER BY sc.scheduled_date, sc.start_time;
     `,  
       [studentId]
     );

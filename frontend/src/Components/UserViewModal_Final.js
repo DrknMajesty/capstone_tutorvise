@@ -52,9 +52,13 @@ const UserViewModal = ({ user, onClose }) => {
           <p className="capitalize">
             <strong>Account Type:</strong> {user.account_type}
           </p>    
-          <p>
-            <strong>Full Name:</strong> {`${user.lname}, ${user.fname} ${user.mname || ""}`}
+          <p className="flex items-center gap-1">
+            <strong>Full Name:</strong>&nbsp;
+            {`${user.lname}, ${user.fname} ${user.mname || ""}`}
+            {user.gender === "male" && <span title="Male">♂️</span>}
+            {user.gender === "female" && <span title="Female">♀️</span>}
           </p>
+
           <p>
             <strong>Birthdate:</strong> {user.birthdate ? formatDate(user.birthdate) : "-"}
           </p>
@@ -103,7 +107,7 @@ const UserViewModal = ({ user, onClose }) => {
                 <strong>Subject Expertise:</strong> {user.extendedProfile.subject ? user.extendedProfile.subject : "-"}
               </p>
               <p>
-                <strong>Credentials:</strong> {user.extendedProfile.credentials ? user.extendedProfile.credentials : "-"}
+                <strong>Experiences:</strong> {user.extendedProfile.experiences ? user.extendedProfile.experiences : "-"}
               </p>
               <p>
                 <strong>Graduate At:</strong> {user.extendedProfile.graduate_at ? formatDate(user.extendedProfile.graduate_at) : "-"}

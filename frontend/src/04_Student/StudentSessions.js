@@ -8,8 +8,8 @@ const SessionTable = ({ sessions, openFeedbackModal }) => (
       <thead className="bg-gray-100">
         <tr>
           <th className="border px-4 py-2 text-left">Tutor</th>
-          <th className="border px-4 py-2 text-left">Date</th>
-          <th className="border px-4 py-2 text-left">Time</th>
+          <th className="border px-4 py-2 text-left">Schedule</th>
+          <th className="border px-4 py-2 text-left">Tutorial Type</th>
           <th className="border px-4 py-2 text-left">Status</th>
           <th className="border px-4 py-2 text-left">Feedback</th>
         </tr>
@@ -18,13 +18,16 @@ const SessionTable = ({ sessions, openFeedbackModal }) => (
         {sessions.map(session => (
           <tr key={session.session_id} className="hover:bg-gray-50">
             <td className="border px-4 py-2">{session.tutor_name}</td>
-            <td className="border px-4 py-2">{new Date(session.scheduled_date).toLocaleDateString()}</td>
             <td className="border px-4 py-2">
-              {new Date(`1970-01-01T${session.start_time}`).toLocaleTimeString([], {
-                hour: '2-digit', minute: '2-digit', hour12: true,
-              })} - {new Date(`1970-01-01T${session.end_time}`).toLocaleTimeString([], {
-                hour: '2-digit', minute: '2-digit', hour12: true,
-              })}
+                {new Date(session.scheduled_date).toLocaleDateString()} - 
+                {new Date(`1970-01-01T${session.start_time}`).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit', hour12: true,
+                })} - {new Date(`1970-01-01T${session.end_time}`).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit', hour12: true,
+                })}    
+            </td>
+            <td className="border px-4 py-2 capitalize">
+              {session.tutorial_type}
             </td>
             <td className="border px-4 py-2 capitalize">{session.status}</td>
             <td className="border px-4 py-2">
@@ -72,6 +75,7 @@ const StudentSessionsPage = () => {
     try {
       const res = await apiService.get(`/sessions/student/${user_id}`);
       setSessions(res.data);
+      console.log("Data:", res.data);
     } catch (err) {
       console.error('Failed to load sessions:', err);
     }
