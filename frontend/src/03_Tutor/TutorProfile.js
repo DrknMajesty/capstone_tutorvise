@@ -52,12 +52,14 @@ const TutorProfile = () => {
   const { oldPassword, newPassword, confirmPassword } = passwordData;
 
   if (!oldPassword || !newPassword || !confirmPassword) {
-    alert('Please fill in all fields.');
+    setAlert({ message: 'Please fill in all fields.', severity: 'error', show: true });
+    // alert('Please fill in all fields.');
     return;
   }
 
   if (newPassword !== confirmPassword) {
-    alert('New passwords do not match.');
+    setAlert({ message: 'New passwords do not match.', severity: 'error', show: true });
+    // alert('New passwords do not match.');
     return;
   }
 
