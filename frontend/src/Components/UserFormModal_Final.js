@@ -46,29 +46,25 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Skip password validation if user chooses to keep current password
-    if (isEdit && skipPasswordUpdate) {
-      // Remove password fields from formData before submission
-      const { password, confirmPassword, ...dataToSubmit } = formData;
-      setFormData(dataToSubmit);
-      onSubmit(e);
-      return;
+
+    let dataToSubmit = { ...formData };
+
+    // In edit mode, only include password fields if changing password
+    if (isEdit && !isChangePassword) {
+      delete dataToSubmit.password;
+      delete dataToSubmit.confirmPassword;
     }
 
-    // Validate passwords if creating new user or changing password
-    if (!isEdit || (isEdit && (formData.password || formData.confirmPassword))) {
-      if (formData.password !== formData.confirmPassword) {
-        setPasswordError("Passwords do not match");
-        return;
-      }
-      
-      if (formData.password && formData.password.length < 8) {
-        setPasswordError("Password must be at least 8 characters");
+    // Validate passwords if present
+    if ((!isEdit || isChangePassword) && (dataToSubmit.password || dataToSubmit.confirmPassword)) {
+      if (dataToSubmit.password !== dataToSubmit.confirmPassword) {
+        setPasswordError("Passwords do not match.");
         return;
       }
     }
 
+    setPasswordError("");
+    setFormData(dataToSubmit);
     onSubmit(e);
   };
 
@@ -252,38 +248,30 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
 
           {/* Password Fields */}
           {(!isEdit || (isEdit && isChangePassword)) && (
-            <div className="grid grid-cols-2 gap-2 mb-2">
-            <h4 className="col-span-2 text-md font-semibold">
-              {isEdit ? "Change Password" : "Enter Password"}
-            </h4>
-              <FloatingField
-                name="password"
-                type="password"
-                label={
-                  <span>
-                    {isEdit ? "New Password" : "Password"} <span className="text-red-500">*</span>
-                  </span>
-                }
-                value={formData.password ?? ""}
-                onChange={handleChange}
-                placeholder={isEdit ? "Leave blank to keep current password" : ""}
-                required={!isEdit}
-              />
-              <FloatingField
-                name="confirmPassword"
-                type="password"
-                label={
-                  <span>
-                    {isEdit ? "Confirm New Password" : "Confirm Password"} <span className="text-red-500">*</span>
-                  </span>
-                }
-                value={formData.confirmPassword ?? ""}
-                onChange={handleChange}
-                placeholder={isEdit ? "Leave blank to keep current password" : ""}
-                required={!isEdit}
-              />
-            </div>
-          )}
+  <div className="grid grid-cols-2 gap-2 mb-2">
+    <h4 className="col-span-2 text-md font-semibold">
+      {isEdit ? "Change Password" : "Enter Password"}
+    </h4>
+    <FloatingField
+      name="password"
+      type="password"
+      label={isEdit ? "New Password" : "Password"}
+      value={formData.password ?? ""}
+      onChange={handleChange}
+      placeholder={isEdit ? "Leave blank to keep current password" : ""}
+      required={!isEdit}
+    />
+    <FloatingField
+      name="confirmPassword"
+      type="password"
+      label={isEdit ? "Confirm New Password" : "Confirm Password"}
+      value={formData.confirmPassword ?? ""}
+      onChange={handleChange}
+      placeholder={isEdit ? "Leave blank to keep current password" : ""}
+      required={!isEdit}
+    />
+  </div>
+)}
 
           {passwordError && (
             <div className="col-span-2 text-red-600 text-sm">
