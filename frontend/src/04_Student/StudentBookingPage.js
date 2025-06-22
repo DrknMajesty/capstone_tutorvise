@@ -355,6 +355,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
     try {
       const res = await apiService.get('/users/active-tutors');
       setTutors(res.data);
+      console.log("Data:", res.data);
     } catch {
       setAlert({ message: 'Failed to fetch tutors.', severity: 'error', show: true });
     }
@@ -770,30 +771,46 @@ const handleWeekdaySelect = (weekdayIndex) => {
               </select>
             </div>
 
-            {selectedTutor && (
-              <div className="border rounded p-4 mb-4 bg-gray-50 flex items-center gap-4">
-                {selectedTutor.profile_image_url && (
-                  <img
-                    src={`http://localhost:5000/uploads/${selectedTutor.profile_image_url}`}
-                    alt="Profile"
-                    className="w-40 h-40 object-cover rounded-full border"
-                  />
-                )}
-                <div>
-                  <p className="flex items-center gap-1">
-                    <strong>Name:</strong>&nbsp;
-                    {selectedTutor.fname} {selectedTutor.lname}
-                    {selectedTutor.gender === "male" && <span title="Male">♂️</span>}
-                    {selectedTutor.gender === "female" && <span title="Female">♀️</span>}
-                  </p>
-                  {selectedTutor.certification && <p><strong>Certification:</strong> {selectedTutor.certification}</p>}
-                  {selectedTutor.subject && <p><strong>Subject Expertise:</strong> {selectedTutor.subject}</p>}
-                  {selectedTutor.teaching_lvl && <p><strong>Academic Level:</strong> {selectedTutor.teaching_lvl}</p>}
-                  {selectedTutor.credentials && <p><strong>Credentials:</strong> {selectedTutor.credentials}</p>}
-                  {selectedTutor.graduate_at && <p><strong>Graduate At:</strong> {selectedTutor.graduate_at}</p>}
-                </div>
-              </div>
-            )}
+{selectedTutor && (
+  <div className="border rounded p-4 mb-4 bg-gray-50 flex items-center gap-4">
+    {selectedTutor.profile_image_url && (
+      <img
+        src={`http://localhost:5000/uploads/${selectedTutor.profile_image_url}`}
+        alt="Profile"
+        className="w-40 h-40 object-cover rounded-full border"
+      />
+    )}
+    <div>
+      <p className="flex items-center gap-1">
+        <strong>Name:</strong>&nbsp;
+        {selectedTutor.fname} {selectedTutor.lname}
+        {selectedTutor.gender === "male" && <span title="Male">♂️</span>}
+        {selectedTutor.gender === "female" && <span title="Female">♀️</span>}
+      </p>
+      
+      {/* ⭐ Average Rating Display */}
+      <p className="flex items-center gap-1">
+        <strong>Ratings<span role="img" aria-label="star">⭐</span>&nbsp;:</strong>&nbsp;
+        {selectedTutor.average_rating !== null ? (
+          <>
+            {Number(selectedTutor.average_rating).toFixed(1)}&nbsp;
+
+            out of {selectedTutor.total_reviews}&nbsp;
+            {selectedTutor.total_reviews === 1 ? 'review' : 'reviews'}
+          </>
+        ) : (
+          <span>No ratings yet</span>
+        )}
+      </p>
+
+      {selectedTutor.certification && <p><strong>Certification:</strong> {selectedTutor.certification}</p>}
+      {selectedTutor.subject && <p><strong>Specialization:</strong> {selectedTutor.subject}</p>}
+      {selectedTutor.teaching_lvl && <p><strong>Academic Level:</strong> {selectedTutor.teaching_lvl}</p>}
+      {selectedTutor.experiences && <p><strong>Experiences:</strong> {selectedTutor.experiences}</p>}
+      {selectedTutor.graduate_at && <p><strong>Graduate At:</strong> {selectedTutor.graduate_at}</p>}
+    </div>
+  </div>
+)}
 
             <div className="mb-4">
               <label className="block font-medium mb-1">Select Timeslot</label>

@@ -107,7 +107,7 @@ const UserViewModal = ({ user, onClose }) => {
                 <strong>Subject Expertise:</strong> {user.extendedProfile.subject ? user.extendedProfile.subject : "-"}
               </p>
               <p>
-                <strong>Credentials:</strong> {user.extendedProfile.credentials ? user.extendedProfile.credentials : "-"}
+                <strong>Experiences:</strong> {user.extendedProfile.experiences ? user.extendedProfile.experiences : "-"}
               </p>
               <p>
                 <strong>Graduate At:</strong> {user.extendedProfile.graduate_at ? formatDate(user.extendedProfile.graduate_at) : "-"}

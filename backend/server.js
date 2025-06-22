@@ -16,6 +16,7 @@ const notification = require('./routes/notificationRoutes');
 const studentSummaryDashboard = require('./routes/studentdashboardRoutes');
 const tutorSummaryDashboard = require('./routes/tutordashboardRoutes');
 const adminSummary = require('./routes/admindashboardRoutes');
+const tutorRoutes = require('./routes/tutorRoutes');
 const path = require('path');
 const db = require('./db'); // Make sure you have this import
 require('./reminderJob'); // Starts the cron job
@@ -59,6 +60,7 @@ app.use('/api/notifications', notification);
 app.use('/api/student', studentSummaryDashboard);
 app.use('/api/tutor', tutorSummaryDashboard);
 app.use('/api/admin', adminSummary);
+app.use('/api/tutors', tutorRoutes);
 
 // Uploads directory for serving static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

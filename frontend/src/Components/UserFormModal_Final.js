@@ -412,14 +412,14 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
                 required
               />
               <FloatingField
-                name="credentials"
+                name="experiences"
                 type="text"
                 label={
                   <span>
-                    Credentials <span className="text-red-500">*</span>
+                    Experiences <span className="text-red-500">*</span>
                   </span>
                 }
-                value={formData.credentials || ""}
+                value={formData.experiences || ""}
                 onChange={handleChange}
                 required
               />

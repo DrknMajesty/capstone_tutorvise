@@ -22,7 +22,7 @@ const TutorProfile = () => {
     certification: '',
     teaching_lvl: '',
     subject: '',
-    credentials: '',
+    experiences: '',
     graduate_at: '',
     major: '',
   }); 
@@ -191,7 +191,7 @@ const TutorProfile = () => {
                <p><strong>Certification:</strong> {profileData.certification}</p>
                <p><strong>Teaching Level:</strong> {profileData.teaching_lvl.charAt(0).toUpperCase() + profileData.teaching_lvl.slice(1)}</p>
                <p><strong>Subject:</strong> {profileData.subject}</p> 
-               <p><strong>Credentials:</strong> {profileData.credentials}</p>
+               <p><strong>Experiences:</strong> {profileData.experiences}</p>
                <p><strong>Graduate At:</strong> {profileData.graduate_at}</p>   
                 <p><strong>Major:</strong> {profileData.major}</p>
              </div>

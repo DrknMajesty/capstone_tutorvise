@@ -27,7 +27,7 @@ const AdminUserPage = () => {
     parent_suffix: '', parent_email: '', parent_contact_no: '',
     // Tutor Fields
     certification: '', teaching_lvl: '', subject: '',
-    credentials: '', graduate_at: '', major: '',
+    experiences: '', graduate_at: '', major: '',
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
@@ -83,7 +83,7 @@ const AdminUserPage = () => {
       parent_fname: '', parent_mname: '', parent_lname: '',
       parent_suffix: '', parent_email: '', parent_contact_no: '',
       certification: '', teaching_lvl: '', subject: '',
-      credentials: '', graduate_at: '', major: '',
+      experiences: '', graduate_at: '', major: '',
     });
   };
 
