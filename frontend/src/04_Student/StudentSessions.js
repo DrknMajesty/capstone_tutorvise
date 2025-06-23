@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
+import Alert from '@mui/material/Alert';
 
 const SessionTable = ({ sessions, openFeedbackModal }) => (
   <div className="overflow-x-auto mb-10">
@@ -71,6 +72,10 @@ const StudentSessionsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const sessionsPerPage = 5;
 
+  const [alert, setAlert] = useState({ message: '', severity: '', show: false });
+  const [fadeOut, setFadeOut] = useState(false);
+
+
   const fetchSessions = useCallback(async () => {
     try {
       const res = await apiService.get(`/sessions/student/${user_id}`);
@@ -108,12 +113,43 @@ const StudentSessionsPage = () => {
   };
 
   const submitFeedback = async () => {
+    const { rating, comment } = feedbackForm;
+
+    // ✅ Basic validation
+    if (!rating || rating < 1 || rating > 5) {
+      setAlert({
+        message: 'Please provide a valid rating between 1 and 5.',
+        severity: 'warning',
+        show: true,
+      });
+      return;
+    }
+
+    if (!comment || comment.trim() === '') {
+      setAlert({
+        message: 'Please enter a comment.',
+        severity: 'warning',
+        show: true,
+      });
+      return;
+    }
+
     try {
       const { session_id } = feedbackModal.session;
       await apiService.post(`/sessions/${session_id}/feedback`, feedbackForm);
       setFeedbackModal({ open: false, session: null });
+      setAlert({
+        message: `Feedback Submitted Successfully.`,
+        severity: 'success',
+        show: true,
+      });
       fetchSessions();
     } catch (err) {
+      setAlert({
+        message: `Feedback Submission Failed.`,
+        severity: 'error',
+        show: true,
+      });
       console.error('Failed to submit feedback:', err);
     }
   };
@@ -122,6 +158,20 @@ const StudentSessionsPage = () => {
   const indexOfFirst = indexOfLast - sessionsPerPage;
   const currentSessions = sessions.slice(indexOfFirst, indexOfLast);
   const totalPages = Math.ceil(sessions.length / sessionsPerPage);
+
+  useEffect(() => {
+    if (alert.show) {
+      const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
+      const hideTimer = setTimeout(() => {
+        setAlert({ ...alert, show: false });
+        setFadeOut(false);
+      }, 4000);
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [alert]);
 
   return (
     <div>
@@ -231,6 +281,21 @@ const StudentSessionsPage = () => {
           </div>
         </div>
       )}
+            {alert.show && (
+              <div
+                className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 transition-opacity duration-500 ${
+                  fadeOut ? 'opacity-0' : 'opacity-100'
+                }`}
+              >
+                <Alert
+                  severity={alert.severity}
+                  variant="filled"
+                  onClose={() => setAlert({ ...alert, show: false })}
+                >
+                  {alert.message}
+                </Alert>
+              </div>
+            )}
     </div>
   );
 };
