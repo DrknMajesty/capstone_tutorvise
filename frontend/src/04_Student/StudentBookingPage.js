@@ -293,6 +293,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
         setisDone(true);
         setHasExpired(false);
         setApplication(null);
+        return;
       }
 
       const isExpired = checkApplicationExpiry(res.data);

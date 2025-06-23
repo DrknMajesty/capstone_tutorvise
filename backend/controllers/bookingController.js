@@ -279,6 +279,7 @@ exports.acceptBooking = async (req, res) => {
         )
     `, [
       booking.tutor_id,
+      booking.student_id, 
       booking.session_date,
       booking.snapshot_end_time, booking.snapshot_end_time,
       booking.snapshot_start_time, booking.snapshot_start_time,
