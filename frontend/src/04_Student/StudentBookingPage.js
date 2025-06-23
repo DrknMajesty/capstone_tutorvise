@@ -16,6 +16,7 @@ const StudentBookingPage = () => {
   const [application, setApplication] = useState(null);
   const [paymentProof, setPaymentProof] = useState(null);
   const [hasExpired, setHasExpired] = useState(false);
+  const [isDone, setisDone] = useState(false);
   const [wasCancelled, setWasCancelled] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDates, setSelectedDates] = useState([]);
@@ -286,6 +287,12 @@ const handleWeekdaySelect = (weekdayIndex) => {
         setHasExpired(false);
         setApplication(null);
         return;
+      }
+
+      if (status === 'done') {
+        setisDone(true);
+        setHasExpired(false);
+        setApplication(null);
       }
 
       const isExpired = checkApplicationExpiry(res.data);
@@ -708,7 +715,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
             </div>
           ) : null}
 
-          {(!application || hasExpired) && (
+          {(!application || hasExpired || isDone ) && (
             loading ? (
               <p>Loading Available Packages...</p>
             ) : error ? (

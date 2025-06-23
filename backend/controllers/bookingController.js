@@ -62,8 +62,8 @@ exports.submitApplication = async (req, res) => {
 
     const timeslot = timeslotRows[0];
 
-    // ⏳ Calculate deadline: 10 minutes from now
-    const deadline = new Date(Date.now() + 1 * 60 * 1000); // 10 minutes in ms
+    // ⏳ Calculate deadline: 
+    const deadline = new Date(Date.now() + 10 * 60 * 1000); 
 
     // Save application with deadline and snapshot info
     await db.query(
@@ -269,6 +269,7 @@ exports.acceptBooking = async (req, res) => {
       FROM schedules sch
       JOIN sessions s ON s.schedule_id = sch.id
       WHERE sch.tutor_id = ?
+        AND sch.student_id = ?
         AND sch.scheduled_date = ?
         AND s.status = 'upcoming'
         AND (
@@ -288,7 +289,7 @@ exports.acceptBooking = async (req, res) => {
       await connection.rollback();
       connection.release();
       return res.status(409).json({
-        error: 'Schedule conflict detected. The tutor already has an upcoming session at that time.'
+        error: 'Schedule conflict detected.'
       });
     }
 

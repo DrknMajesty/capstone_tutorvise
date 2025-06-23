@@ -20,7 +20,7 @@ exports.getMyApplication = async (req, res) => {
       JOIN packages p ON a.package_id = p.id
       JOIN users t ON a.tutor_id = t.id
       WHERE a.student_id = ? 
-        AND a.application_status IN ('Pending', 'Expired', 'Submitted', 'Approved', 'Cancelled')
+        AND a.application_status IN ('Pending', 'Expired', 'Submitted', 'Approved', 'Cancelled', 'Done')
       ORDER BY a.created_at DESC
       LIMIT 1;
     `, [studentId]);
