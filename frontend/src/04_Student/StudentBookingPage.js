@@ -31,6 +31,7 @@ const StudentBookingPage = () => {
   const userId = parseInt(sessionStorage.getItem('user_id'), 10);
 
   const [bookedDates, setBookedDates] = useState([]);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
 
   const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
     const totalPrice = parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
@@ -454,18 +455,29 @@ const handleWeekdaySelect = (weekdayIndex) => {
   };
 
   const handleCancelApplication = async () => {
-  if (!window.confirm('Are you sure you want to cancel this application?')) return;
-  try {
-    await apiService.post(`/applications/cancel/${application.id}`);
-    setAlert({ message: 'Application cancelled successfully.', severity: 'success', show: true });
-    setApplication(null);
-    setPaymentProof(null);
-    await fetchApplication();
-  } catch (error) {
-    console.error('Error cancelling application:', error);
-    setAlert({ message: 'Failed to cancel application: ' + (error.response?.data?.message || ''), severity: 'error', show: true });
-  }
-};
+    try {
+      await apiService.post(`/applications/cancel/${application.id}`);
+      setAlert({ message: 'Application cancelled successfully.', severity: 'success', show: true });
+      setApplication(null);
+      setPaymentProof(null);
+      await fetchApplication();
+    } catch (error) {
+      console.error('Error cancelling application:', error);
+      setAlert({
+        message: 'Failed to cancel application: ' + (error.response?.data?.message || ''),
+        severity: 'error',
+        show: true,
+      });
+    } finally {
+      setConfirmCancelOpen(false); // Close the dialog either way
+    }
+  };
+
+    const confirmCancel = () => {
+    setConfirmCancelOpen(true);
+  };
+
+
   const formatDateLocal = (date) => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -476,7 +488,8 @@ const handleWeekdaySelect = (weekdayIndex) => {
   const shouldShowApplication = application && 
                               (application.application_status === 'pending' || 
                                application.application_status === 'submitted' || 
-                               application.application_status === 'approved') && 
+                               application.application_status === 'approved' || 
+                               application.application_status === 'done') && 
                               !hasExpired;
 
   const renderApplicationDetails = () => {
@@ -667,12 +680,11 @@ const handleWeekdaySelect = (weekdayIndex) => {
                   Submit Payment Proof
                 </button>
                 <button
-                  onClick={handleCancelApplication}
-                  className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                  onClick={confirmCancel}
+                  className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded"
                 >
                   Cancel Application
                 </button>
-
               </form>
             </>
           ) : (
@@ -871,6 +883,29 @@ const handleWeekdaySelect = (weekdayIndex) => {
           >
             {alert.message}
           </Alert>
+        </div>
+      )}
+
+      {confirmCancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-sm w-full p-6">
+            <h2 className="text-lg font-semibold mb-4">Cancel Application</h2>
+            <p className="mb-6">Are you sure you want to cancel this application?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmCancelOpen(false)}
+                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+              >
+                No
+              </button>
+              <button
+                onClick={handleCancelApplication }
+                className="px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white"
+              >
+                Yes, Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
