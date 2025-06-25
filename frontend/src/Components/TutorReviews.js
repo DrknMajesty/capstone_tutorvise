@@ -37,9 +37,9 @@ const TutorReviews = () => {
   };
 
   return (
-    <section className="py-8 px-4 bg-white max-w-6xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">What Students Say About Our Tutors</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <section className="py-8 px-4 max-w-6xl mx-auto">
+      <h2 className="text-4xl font-helvetica font-bold text-[#6c3f15] mb-14 text-center">What Students Say About Our Tutors</h2>
+      <div className="flex flex-row gap-6 justify-center flex-wrap">
         {tutors.map((tutor) => (
           <div
             key={tutor.tutor_id}
