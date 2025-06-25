@@ -14,12 +14,9 @@ const LandingPage = () => {
   
   return (
     <div className="bg-[#f9f8f6] min-h-screen flex flex-col p-24">
-      {/* <ResponsiveNavbar /> */}
 
       <main className="min-h-[85vh] flex-col gap-10 bg-[#f6f5f3] rounded-xl shadow-2xl">
-        
-        <div className="flex flex-col">
-          {/* Hero Section */}
+        {/* Hero Section */}
           <div className={`sticky top-0 z-50 bg-[#f6f5f3] flex flex-row justify-between items-center px-8 py-4 transition-shadow duration-300 ${
               scrolled ? 'shadow' : ''
             }`}
@@ -50,8 +47,10 @@ const LandingPage = () => {
               </a>
             </div>
           </div>
+        <div className="flex flex-col">
+          
           {/* Home Section */}
-          <div id='home' className="flex flex-row px-24 py-18 content-around gap-8 items-center justify-between">
+          <div id='home' className="flex flex-row px-24 py-24 mb-32 content-around gap-8 items-center justify-between">
             <div className="flex flex-col content-around justify-center p-8 gap-4">
               <h1 className="text-6xl font-helvetica font-bold text-[#6c3f15] mb-6">
                 Einstein: Center for Modern Education
@@ -86,7 +85,7 @@ const LandingPage = () => {
               We’d love to hear from you! Whether you have questions, inquiries, or need support—feel free to reach out.
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8  justify-center flex-wrap">
               <div className="p-4">
                 <h3 className="text-xl font-semibold mb-2">📍 Address</h3>
                 <p>123 Learning Lane,<br />Tutor City, PH 56789</p>
