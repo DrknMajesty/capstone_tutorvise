@@ -154,7 +154,7 @@ const AdminProfile = () => {
             <p><strong>ID:</strong> {userData.id}</p>
             <p><strong>Username:</strong> {userData.username}</p>
             <p><strong>Fullname:</strong> 
-            {userData.lname}, 
+            {userData.lname}, {''} 
             {userData.fname} 
             {abbreviateMiddleName(userData.mname)} 
             {userData.suffix}
