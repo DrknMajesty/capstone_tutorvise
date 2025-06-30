@@ -155,9 +155,9 @@ const AdminProfile = () => {
             <p><strong>Username:</strong> {userData.username}</p>
             <p><strong>Fullname:</strong> 
             {userData.lname}, {''} 
-            {userData.fname} 
+            {userData.fname} {''}
             {abbreviateMiddleName(userData.mname)} 
-            {userData.suffix}
+            {userData.suffix} {''}
             {userData.gender === "male" && <span title="Male">♂️</span>}
             {userData.gender === "female" && <span title="Female">♀️</span>}
             </p>
