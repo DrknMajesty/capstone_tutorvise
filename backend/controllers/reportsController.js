@@ -40,21 +40,25 @@ exports.getTutorFeedbackDetails = async (req, res) => {
 
   try {
     const [results] = await db.query(`
-      SELECT 
-        sch.scheduled_date,
-        sch.start_time,
-        sch.end_time,
-        f.rating,
-        f.comment
-      FROM schedules sch
-      JOIN sessions sess ON sess.schedule_id = sch.id
-      JOIN feedback f ON f.session_id = sess.id
-      WHERE sch.tutor_id = ?
-        AND sess.status = 'confirmed'
-        AND f.rating IS NOT NULL
-      ORDER BY sch.scheduled_date DESC, sch.start_time
+SELECT 
+  sch.scheduled_date,
+  sch.student_id,
+  student.lname AS student_lname,
+  student.fname as student_fname,
+  sch.start_time,
+  sch.end_time,
+  f.rating,
+  f.comment
+FROM schedules sch
+JOIN sessions sess ON sess.schedule_id = sch.id
+JOIN feedback f ON f.session_id = sess.id
+JOIN users student ON student.id = sch.student_id
+WHERE sch.tutor_id = ?
+  AND sess.status = 'confirmed'
+  AND f.rating IS NOT NULL
+ORDER BY sch.scheduled_date DESC, sch.start_time;
     `, [tutorId]);
-
+      console.log("Data:", results);
     res.json(results);
   } catch (err) {
     console.error('Error fetching tutor feedback details:', err);
@@ -87,7 +91,7 @@ exports.getFinanceReport = async (req, res) => {
     }
 
     const [apps] = await db.query(baseSql, params);
-    console.log('Fetched applications:', apps);
+    // console.log('Fetched applications:', apps);
 
   const income = apps
     .filter(a => ['approved', 'done'].includes(a.application_status.toLowerCase()))

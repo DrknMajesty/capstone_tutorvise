@@ -150,7 +150,7 @@ const AdminReportPage = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Financial Report
+              Finances
             </button>
           </nav>
         </div>
@@ -198,51 +198,66 @@ const AdminReportPage = () => {
           </div>
         )}
 
-        {activeTab === 'finance' && (
-          <div className="bg-gray-100 p-6 rounded shadow mb-8">
-            <h2 className="text-xl font-semibold mb-4">Income Report</h2>
-            {isLoading.finance ? (
-              <p>Loading financial data...</p>
-            ) : (
-              <>
-                <p className="text-lg">Total Income: <strong>₱{Number(financeData.income).toFixed(2)}</strong></p>
-                <p className="text-lg">Total Receivables: <strong>₱{Number(financeData.receivables).toFixed(2)}</strong></p>
+       {activeTab === 'finance' && (
+        <div className="bg-gray-100 p-6 rounded shadow mb-8">
+          <h2 className="text-xl font-semibold mb-4">Income Report</h2>
+          {isLoading.finance ? (
+            <p>Loading financial data...</p>
+          ) : (
+            <>
+              <p className="text-lg">
+                Total Income: <strong>₱{Number(financeData.income).toFixed(2)}</strong>
+              </p>
+              <p className="text-lg">
+                Total Receivables: <strong>₱{Number(financeData.receivables).toFixed(2)}</strong>
+              </p>
 
-                {financeData.applications?.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2">Application Details</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border border-gray-300 text-sm">
-                        <thead className="bg-gray-100">
-                          <tr>
-                            <th className="border px-4 py-2">ID</th>
-                            <th className="border px-4 py-2">Status</th>
-                            <th className="border px-4 py-2">Student</th>
-                            <th className="border px-4 py-2">Package</th>
-                            <th className="border px-4 py-2">Submitted</th>
-                            <th className="border px-4 py-2">Amount</th>
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2">Application Details</h3>
+
+                {financeData.applications?.length === 0 ? (
+                  <p className="text-gray-500 italic">
+                    {activeFilters.start || activeFilters.end
+                      ? 'No applications found for the selected date range.'
+                      : 'No application records available.'}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border border-gray-300 text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="border px-4 py-2">ID</th>
+                          <th className="border px-4 py-2">Status</th>
+                          <th className="border px-4 py-2">Student</th>
+                          <th className="border px-4 py-2">Package</th>
+                          <th className="border px-4 py-2">Submitted</th>
+                          <th className="border px-4 py-2">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {financeData.applications.map((app, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="border px-4 py-2">{app.application_id}</td>
+                            <td className="border px-4 py-2 capitalize">{app.application_status}</td>
+                            <td className="border px-4 py-2">{app.student_name}</td>
+                            <td className="border px-4 py-2">{app.package_name}</td>
+                            <td className="border px-4 py-2">
+                              {new Date(app.submitted_at).toLocaleDateString()}
+                            </td>
+                            <td className="border px-4 py-2">
+                              ₱{Number(app.total_price).toFixed(2)}
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {financeData.applications.map((app, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="border px-4 py-2">{app.application_id}</td>
-                              <td className="border px-4 py-2 capitalize">{app.application_status}</td>
-                              <td className="border px-4 py-2">{app.student_name}</td>
-                              <td className="border px-4 py-2">{app.package_name}</td>
-                              <td className="border px-4 py-2">{new Date(app.submitted_at).toLocaleDateString()}</td>
-                              <td className="border px-4 py-2">₱{Number(app.total_price).toFixed(2)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-              </>
-            )}
-          </div>
-        )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
         {activeTab === 'ratings' && (
           isLoading.ratings ? (
@@ -306,6 +321,7 @@ const AdminReportPage = () => {
                       <tr>
                         <th className="border px-4 py-2 text-left">Date</th>
                         <th className="border px-4 py-2 text-left">Time</th>
+                        <th className="border px-4 py-2 text-left">Student</th>
                         <th className="border px-4 py-2 text-left">Rating</th>
                         <th className="border px-4 py-2 text-left">Comment</th>
                       </tr>
@@ -320,12 +336,16 @@ const AdminReportPage = () => {
                             })} - {new Date(`1970-01-01T${fb.end_time}`).toLocaleTimeString([], {
                               hour: '2-digit', minute: '2-digit', hour12: true,
                             })}
+                          </td>     
+                          <td className="border px-4 py-2">
+                            {fb.student_lname}
                           </td>
                           <td className="border px-4 py-2">
                             <div className="flex text-yellow-500 text-sm">
                               {'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}
                             </div>
                           </td>
+
                           <td className="border px-4 py-2 italic text-gray-700">{fb.comment}</td>
                         </tr>
                       ))}

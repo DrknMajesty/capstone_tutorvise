@@ -158,14 +158,14 @@ const BookingList = ({
                     <td className="p-2">{booking.tutor_name || 'N/A'}</td>
                   )}
                   <td className="p-2">
-                    {role === 'admin' && booking.booking_status === 'pending' && (
+                    {/* {role === 'admin' && booking.booking_status === 'pending' && (
                       <button
                         onClick={() => handleAccept(booking.booking_id)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
                       >
                         Confirm
                       </button>
-                    )}
+                    )} */}
 
                     {role === 'tutor' && booking.booking_status === 'pending' && (
                       <div className="flex space-x-2">
@@ -184,14 +184,14 @@ const BookingList = ({
                       </div>
                     )}
 
-                    {role === 'tutor' && booking.booking_status === 'scheduled' && (
+                    {/* {role === 'tutor' && booking.booking_status === 'scheduled' && (
                       <button
                         onClick={() => handleCancel(booking.booking_id)}
                         className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
                       >
                         Cancel
                       </button>
-                    )}
+                    )} */}
 
                     {role === 'student' &&
                       ['scheduled', 'pending'].includes(booking.booking_status) && (

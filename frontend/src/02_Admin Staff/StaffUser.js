@@ -87,34 +87,55 @@ const StaffUserPage = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const form = new FormData();
-    for (const key in formData) {
-      if (formData[key]) {
-        form.append(key, formData[key]);
-      }
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  // Normalize and trim the input email
+  const trimmedEmail = formData.email.trim().toLowerCase();
+
+  // Check for existing email (exclude current user if editing)
+  const emailExists = users.some(user =>
+    user.email.toLowerCase() === trimmedEmail &&
+    (!isEdit || user.id !== formData.id) // allow same email if it's the user being edited
+  );
+
+  if (emailExists) {
+    setAlert({
+      message: 'Email already exists. Please use a different email.',
+      severity: 'error',
+      show: true,
+    });
+    return;
+  }
+
+  // Prepare form data
+  const form = new FormData();
+  for (const key in formData) {
+    if (formData[key]) {
+      form.append(key, formData[key]);
+    }
+  }
+
+  try {
+    if (isEdit) {
+      await apiService.put(`/users/update/${formData.id}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setAlert({ message: 'User Updated Successfully.', severity: 'success', show: true });
+    } else {
+      await apiService.post('/users/create', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setAlert({ message: 'User Created Successfully.', severity: 'success', show: true });
     }
 
-    try {
-      if (isEdit) {
-        await apiService.put(`/users/update/${formData.id}`, form, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        setAlert({ message: 'User updated successfully.', severity: 'success', show: true });
-      } else {
-        await apiService.post('/users/create', form, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        setAlert({ message: 'User created successfully.', severity: 'success', show: true });
-      }
-      resetForm();
-      setShowForm(false);
-      fetchUsers();
-    } catch (err) {
-      setAlert({ message: 'Error saving user. Please check input.', severity: 'error', show: true });
-    }
-  };
+    resetForm();
+    setShowForm(false);
+    fetchUsers();
+  } catch (err) {
+    setAlert({ message: 'Error saving user. Please check input.', severity: 'error', show: true });
+  }
+};
 
   const handleViewUser = async (user) => {
     let extendedProfile = null;
