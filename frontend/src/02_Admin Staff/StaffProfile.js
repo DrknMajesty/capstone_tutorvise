@@ -153,10 +153,10 @@ const StaffProfile = () => {
             <p><strong>ID:</strong> {userData.id}</p>
             <p><strong>Username:</strong> {userData.username}</p>
               <p><strong>Fullname:</strong> 
-                {userData.lname}, 
-                {userData.fname} 
+                {userData.lname}, {''}
+                {userData.fname} {''}
                 {abbreviateMiddleName(userData.mname)} 
-                {userData.suffix}
+                {userData.suffix} {''}
                 {userData.gender === "male" && <span title="Male">♂️</span>}
                 {userData.gender === "female" && <span title="Female">♀️</span>}
               </p>
