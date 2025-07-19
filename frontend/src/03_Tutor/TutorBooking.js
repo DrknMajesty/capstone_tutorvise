@@ -17,6 +17,7 @@ const TutorBookingPage = () => {
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [selectedAppId, setSelectedAppId] = useState('');
+  const [otherReason, setOtherReason] = useState('');
 
   const tutorId = sessionStorage.getItem('user_id');
 
@@ -39,36 +40,36 @@ const TutorBookingPage = () => {
     }
   }, [tutorId]);
 
-const handleAccept = async (bookingId) => {
-  try {
-    await apiService.put(`/bookings/${bookingId}/confirm`);
-    setBookings(prev => prev.map(b =>
-      b.booking_id === bookingId
-        ? { ...b, booking_status: 'accepted' }
-        : b
-    ));
-    setAlert({ message: 'Booking accepted', severity: 'success', show: true });
-  } catch (err) {
-    console.error('Error accepting booking:', err);
-    
-    const status = err.response?.status;
-    const msg = err.response?.data?.error || 'Failed to accept booking.';
+  const handleAccept = async (bookingId) => {
+    try {
+      await apiService.put(`/bookings/${bookingId}/confirm`);
+      setBookings(prev => prev.map(b =>
+        b.booking_id === bookingId
+          ? { ...b, booking_status: 'accepted' }
+          : b
+      ));
+      setAlert({ message: 'Booking accepted', severity: 'success', show: true });
+    } catch (err) {
+      console.error('Error accepting booking:', err);
+      
+      const status = err.response?.status;
+      const msg = err.response?.data?.error || 'Failed to accept booking.';
 
-    if (status === 409) {
-      setAlert({
-        message: 'Booked schedule overlaps with existing schedules. Please cancel the booking.',
-        severity: 'warning',
-        show: true
-      });
-    } else {
-      setAlert({
-        message: msg,
-        severity: 'error',
-        show: true
-      });
+      if (status === 409) {
+        setAlert({
+          message: 'Booked schedule overlaps with existing schedules. Please cancel the booking.',
+          severity: 'warning',
+          show: true
+        });
+      } else {
+        setAlert({
+          message: msg,
+          severity: 'error',
+          show: true
+        });
+      }
     }
-  }
-};
+  };
 
   const handleCancelClick = (bookingId) => {
     setSelectedBookingId(bookingId);
@@ -76,21 +77,21 @@ const handleAccept = async (bookingId) => {
   };
 
   const handleCancelConfirm = async () => {
-    if (!selectedBookingId || !cancelReason) return;
+    if (!selectedBookingId || !cancelReason || (cancelReason === 'other' && !otherReason)) return;
 
     try {
       await apiService.put(`/bookings/tutors/${selectedBookingId}/cancel`, {
-        cancel_reason: cancelReason
+        cancel_reason: cancelReason === 'other' ? otherReason : cancelReason
       });
 
       setBookings(prev => prev.map(b =>
         b.booking_id === selectedBookingId
-          ? { ...b, booking_status: 'cancelled', cancel_reason: cancelReason }
+          ? { ...b, booking_status: 'cancelled', cancel_reason: cancelReason === 'other' ? otherReason : cancelReason }
           : b
       ));
 
       setAlert({
-        message: `Booking cancelled. Reason: ${cancelReason}`,
+        message: `Booking cancelled. Reason: ${cancelReason === 'other' ? otherReason : cancelReason}`,
         severity: 'info',
         show: true
       });
@@ -104,6 +105,7 @@ const handleAccept = async (bookingId) => {
     } finally {
       setCancelModalOpen(false);
       setCancelReason('');
+      setOtherReason('');
       setSelectedBookingId(null);
     }
   };
@@ -196,6 +198,16 @@ const handleAccept = async (bookingId) => {
               <option value="conflict">Personal Schedule Conflict</option>
               <option value="other">Other</option>
             </select>
+            {cancelReason === 'other' && (
+              <input
+                type="text"
+                className="mt-2 w-full p-2 border border-gray-300 rounded-md"
+                placeholder="Please specify your reason"
+                value={otherReason || ''}
+                onChange={e => setOtherReason(e.target.value)}
+                required
+              />
+            )}
           </div>
           <div className="flex justify-end space-x-2">
             <Button variant="outlined" onClick={() => setCancelModalOpen(false)}>
