@@ -33,7 +33,7 @@ JOIN packages ON applications.package_id = packages.id
 
 -- ✅ Join sessions and filter by 'upcoming'
 JOIN sessions ON sessions.schedule_id = schedules.id
-WHERE sessions.status IN ('upcoming', 'completed')
+WHERE sessions.status IN ('upcoming')
 
 ORDER BY schedules.scheduled_date, schedules.start_time;
 

@@ -106,6 +106,11 @@ const handleSubmit = async (e) => {
     return;
   }
 
+  // If password field is blank during edit, don't include it
+  if (isEdit && (!formData.password || formData.password.trim() === '')) {
+    delete formData.password;
+  }
+
   // Prepare form data
   const form = new FormData();
   for (const key in formData) {
@@ -119,6 +124,7 @@ const handleSubmit = async (e) => {
       await apiService.put(`/users/update/${formData.id}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      console.log('User updated successfully', formData);
       setAlert({ message: 'User Updated Successfully.', severity: 'success', show: true });
     } else {
       await apiService.post('/users/create', form, {
@@ -176,8 +182,9 @@ const handleEditUser = async (user) => {
     : '';
 
   setFormData({
-    ...user, // user.id stays intact
-    ...extendedProfile, // renamed id won't overwrite
+    ...user,
+    ...extendedProfile,
+    password: '', // <<< clear the password field
     birthdate: formattedBirthdate,
     profile_image: user.profile_image_url || '',
   });

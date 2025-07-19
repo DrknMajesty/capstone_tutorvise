@@ -31,6 +31,12 @@ router.get('/profile/tutor/:id', authenticateToken, userController.getTutorProfi
 // Put user password update
 router.put('/update-password/:id', authenticateToken, userController.changePassword);
 
+// Put user new email update
+router.put('/update-email/:id', authenticateToken, userController.updateEmail);
+
+// Put user contact number update
+router.put('/update-contact/:id', authenticateToken, userController.updateContactNumber);
+
 // Create a new user
 router.post('/create', authenticateToken, upload.single('profile_image'), userController.createUser);
 

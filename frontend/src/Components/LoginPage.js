@@ -16,6 +16,8 @@ const LoginPage = () => {
 
     try {
       const res = await apiService.post('/login', { username, password });
+      console.log("Password entered:", password);
+      
       const { token, account_type } = res.data;
 
       saveToken(token);

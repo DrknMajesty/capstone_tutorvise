@@ -34,7 +34,7 @@ const StaffDashboard = () => {
       <ResponsiveNavbar username="Admin" />
       <div className="h-24" />
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <h1 className="text-3xl font-bold mb-6">Welcome, Admin</h1>
+        <h1 className="text-3xl font-bold mb-6">Welcome, Admin Staff</h1>
 
         {/* User Stats */}
         <h2 className="text-xl font-semibold mb-4">User Overview</h2>

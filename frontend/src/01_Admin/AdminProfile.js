@@ -140,17 +140,21 @@ const AdminProfile = () => {
           <p>Loading...</p>
         ) : (
           <div className="profile-info">
-            {userData.profileImageUrl ? (
-              <img 
-                src={userData.profileImageUrl} 
-                alt="Profile" 
-                className="profile-image"
-              />
-            ) : (
-              <div className="no-image-placeholder">
-                No Image
-              </div>
-            )}
+                {userData.profile_image_url ? (
+                  <img 
+                    src={
+                      userData.profile_image_url
+                        ? `http://localhost:5000/uploads/${userData.profile_image_url}`
+                        : '/default-avatar.png'
+                    }
+                    alt="Profile" 
+                    className="profile-image"
+                  />
+                ): (
+                 <div className="no-image-placeholder">
+                   No Image
+                 </div>
+               )}
             <p><strong>ID:</strong> {userData.id}</p>
             <p><strong>Username:</strong> {userData.username}</p>
             <p><strong>Fullname:</strong> 

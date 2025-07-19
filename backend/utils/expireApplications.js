@@ -7,12 +7,14 @@ const expireOldApplications = async () => {
     await connection.beginTransaction();
 
     // Find applications that should be expired
-    const [expiredApps] = await connection.query(
-      `SELECT id, timeslot_id FROM applications 
-       WHERE application_status = 'Pending' 
-       AND deadline < NOW()
-       AND (payment_proof IS NULL OR payment_proof = '')`
-    );
+    const [expiredApps] = await connection.query(`
+      SELECT a.id, a.timeslot_id
+      FROM applications a
+      LEFT JOIN payments p ON p.application_id = a.id
+      WHERE a.application_status = 'pending'
+        AND a.deadline < NOW()
+        AND (p.payment_proof IS NULL OR p.payment_proof = '');
+    `);
 
     if (expiredApps.length === 0) {
       await connection.commit();

@@ -43,16 +43,17 @@ exports.getAvailableTimeslots = async (req, res) => {
 };
 
 exports.submitApplication = async (req, res) => {
-  const { student_id, package_id, tutor_id, timeslot_id } = req.body;
+  const { student_id, package_id, tutor_id, timeslot_id, paymentType } = req.body;
+  console.log('Received data:', req.body);
 
-  if (!student_id || !package_id || !tutor_id || !timeslot_id) {
+  if (!student_id || !package_id || !tutor_id || !timeslot_id || !paymentType) {
     return res.status(400).json({ message: 'Missing required fields.' });
   }
 
   try {
     // Fetch timeslot snapshot
     const [timeslotRows] = await db.query(
-      `SELECT start_time, end_time, status FROM timeslots WHERE id = ?`,
+      `SELECT start_time, end_time FROM timeslots WHERE id = ?`,
       [timeslot_id]
     );
 
@@ -62,14 +63,29 @@ exports.submitApplication = async (req, res) => {
 
     const timeslot = timeslotRows[0];
 
-    // ⏳ Calculate deadline: 
-    const deadline = new Date(Date.now() + 10 * 60 * 1000); 
+    // Fetch package details
+    const [packageRows] = await db.query(
+      `SELECT price_package, price_sessions, total_sessions FROM packages WHERE id = ?`,
+      [package_id]
+    );
 
-    // Save application with deadline and snapshot info
+    if (packageRows.length === 0) {
+      return res.status(404).json({ message: 'Package not found.' });
+    }
+
+    const { price_package, price_sessions, total_sessions } = packageRows[0];
+
+    // Calculate total cost from session price * session count
+    const package_cost = parseFloat(price_package) + (parseFloat(price_sessions) * parseInt(total_sessions));
+
+    // 12-hour deadline
+    const deadline = new Date(Date.now() + 12 * 60 * 60 * 1000);
+
+    // Save application
     await db.query(
       `INSERT INTO applications 
-        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time, deadline)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time, deadline, package_cost, paymentType)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         student_id,
         package_id,
@@ -78,9 +94,12 @@ exports.submitApplication = async (req, res) => {
         timeslot.start_time,
         timeslot.end_time,
         deadline,
+        package_cost,
+        paymentType,
       ]
     );
 
+    // Update timeslot status
     await db.query(
       `UPDATE timeslots SET status = 'pending' WHERE id = ?`,
       [timeslot_id]
@@ -92,6 +111,7 @@ exports.submitApplication = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
+
 // 
 exports.scheduleSessions = async (req, res) => {
   const { application_id, dates } = req.body;

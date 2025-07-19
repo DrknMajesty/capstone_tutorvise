@@ -18,7 +18,7 @@ const StudentBookingPage = () => {
   const [hasExpired, setHasExpired] = useState(false);
   const [isDone, setisDone] = useState(false);
   const [wasCancelled, setWasCancelled] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
+  const [setShowCalendar] = useState(false); //showCalendar
   const [selectedDates, setSelectedDates] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedWeekday, setSelectedWeekday] = useState(null);
@@ -32,6 +32,11 @@ const StudentBookingPage = () => {
 
   const [bookedDates, setBookedDates] = useState([]);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [loadingTimeslots, setLoadingTimeslots] = useState(false);
+  const [tab, setTab] = useState('package');
+  const [paymentType, setPaymentType] = useState('');
+
+  const [applicationStatus, setApplicationStatus] = useState('');
 
   const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
     const totalPrice = parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
@@ -198,7 +203,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
 
     return [...prev, ...datesToAdd];
   });
-};
+  };
 
 
   const handleSessionBooking = async () => {
@@ -273,7 +278,8 @@ const handleWeekdaySelect = (weekdayIndex) => {
   const fetchApplication = useCallback(async () => {
     try {
       const res = await apiService.get(`/applications/my-applications/${userId}`);
-      console.log("Data:", res);
+      setApplicationStatus(res.data.application_status || '');
+      console.log("Data:", res.data);
       if (!res.data) {
         setApplication(null);
         setHasExpired(false);
@@ -349,15 +355,16 @@ const handleWeekdaySelect = (weekdayIndex) => {
     fetchApplication();
   }, [fetchApplication]);
 
-  useEffect(() => {
-    if (hasExpired || wasCancelled) {
-      const timer = setTimeout(() => {
-        setHasExpired(false);
-        setWasCancelled(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [hasExpired, wasCancelled]);
+// Reset expired or cancelled state after 5 seconds
+  // useEffect(() => {
+  //   if (hasExpired || wasCancelled) {
+  //     const timer = setTimeout(() => {
+  //       setHasExpired(false);
+  //       setWasCancelled(false);
+  //     }, 5000);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [hasExpired, wasCancelled]);
 
 
   const fetchTutors = async () => {
@@ -369,8 +376,6 @@ const handleWeekdaySelect = (weekdayIndex) => {
       setAlert({ message: 'Failed to fetch tutors.', severity: 'error', show: true });
     }
   };
-
-  const [loadingTimeslots, setLoadingTimeslots] = useState(false);
 
   const fetchTimeslots = async (tutorId) => {
     setLoadingTimeslots(true);
@@ -407,51 +412,66 @@ const handleWeekdaySelect = (weekdayIndex) => {
   };
 
   const handleBookingSubmit = async () => {
-    if (!selectedTutor || !selectedSlot) {
-      return setAlert({ message: 'Please select a tutor and timeslot.', severity: 'error', show: true });
+    if (!selectedTutor) {
+      return setAlert({ message: 'Please select a tutor.', severity: 'warning', show: true });
     }
+
+    if (!selectedSlot) {
+      return setAlert({ message: 'Please select an available timeslot.', severity: 'warning', show: true });
+    }
+
+    if (!paymentType) {
+      return setAlert({ message: 'Please select a payment type.', severity: 'warning', show: true });
+    }
+
     try {
       await apiService.post('/bookings/apply', {
         student_id: userId,
         package_id: selectedPackage.id,
         tutor_id: selectedTutor.id,
-        timeslot_id: parseInt(selectedSlot, 10)
+        timeslot_id: parseInt(selectedSlot, 10),
+        paymentType: paymentType,
       });
 
+      setTab('application');
       setSelectedTutor(null);
       setSelectedSlot('');
+      setPaymentType('');
       setTimeslots([]);
       setShowModal(false);
       await fetchApplication();
-      setAlert({ message: 'Booking submitted successfully. Please wait for admin approval.', severity: 'success', show: true });
+      setAlert({ message: 'Booking submitted successfully. Please wait for 24 hours for admin approval.', severity: 'success', show: true });
     } catch (err) {
       console.error('Error submitting booking:', err);
       setAlert({ message: 'Failed to submit booking. ' + (err.response?.data?.message || ''), severity: 'error', show: true });
     }
   };
 
-  const CountdownTimer = ({ deadline, onExpire }) => {
-    const [timeLeft, setTimeLeft] = useState('');
+const CountdownTimer = ({ deadline, onExpire }) => {
+  const [timeLeft, setTimeLeft] = useState('');
 
-    useEffect(() => {
-      const interval = setInterval(() => {
-        const diff = new Date(deadline) - new Date();
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const diff = new Date(deadline) - new Date();
 
-        if (diff <= 0) {
-          clearInterval(interval);
-          setTimeLeft('Expired');
-          if (onExpire) onExpire();
-        } else {
-          const minutes = Math.floor(diff / 60000);
-          const seconds = Math.floor((diff % 60000) / 1000);
-          setTimeLeft(`${minutes}m ${seconds}s`);
-        }
-      }, 1000);
+      if (diff <= 0) {
+        clearInterval(interval);
+        setTimeLeft('Expired');
+        if (onExpire) onExpire();
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      return () => clearInterval(interval);
-    }, [deadline, onExpire]);
+        const format = (val) => String(val).padStart(2, '0');
+        setTimeLeft(`${format(hours)}:${format(minutes)}:${format(seconds)}`);
+      }
+    }, 1000);
 
-    return <p className="text-red-600 font-bold">Time Left: {timeLeft}</p>;
+    return () => clearInterval(interval);
+  }, [deadline, onExpire]);
+
+  return <p className="text-red-600 font-bold">Time Left: {timeLeft}</p>;
   };
 
   const handleCancelApplication = async () => {
@@ -489,223 +509,218 @@ const handleWeekdaySelect = (weekdayIndex) => {
                               (application.application_status === 'pending' || 
                                application.application_status === 'submitted' || 
                                application.application_status === 'approved' || 
-                               application.application_status === 'done') && 
+                               application.application_status === 'done' ||
+                               application.application_status === 'cancelled'
+                              ) && 
                               !hasExpired;
 
-  const renderApplicationDetails = () => {
-    if (application.application_status === 'approved') {
-      return (
-        <div className="mt-4 w-full bg-white p-6 rounded-lg shadow-lg border border-gray-300">
-          <h2 className="text-2xl font-bold text-green-600 mb-4">Application Details</h2>
-          <p><strong>Application ID:</strong> {application.id}</p>
-          <p><strong>Package:</strong> {application.package_name}</p>
-          <p><strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname} {application.gender === "male" && <span title="Male">♂️</span>} {application.gender === "female" && <span title="Female">♀️</span>}    
-      </p>
-          <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
-          <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
-          <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
+const Legend = ({ color, label }) => (
+  <div className="flex items-center gap-1">
+    <div className={`w-4 h-4 rounded ${color}`}></div>
+    <span>{label}</span>
+  </div>
+);
+
+const renderApplicationDetails = () => {
+  if (!application) return null;
+
+  const baseCardClass = "w-full bg-white p-6 rounded-lg shadow-lg border border-gray-200";
+
+  const renderCommonDetails = () => (
+    <div className={`${baseCardClass} mb-6`}>
+      <h2 className="text-2xl font-bold text-green-600 mb-6 text-center">Application Details</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-10 text-sm text-gray-800">
+        <p><strong>Application ID:</strong> {application.id}</p>
+        <p>
+          <strong>Tutor:</strong> {application.tutor_fname} {application.tutor_lname}
+          {application.gender === "male" && <span className="ml-1 text-blue-500" title="Male">♂️</span>}
+          {application.gender === "female" && <span className="ml-1 text-pink-500" title="Female">♀️</span>}
+        </p>
+        <p><strong>Package:</strong> {application.package_name}</p>
+        <p><strong>Total Cost:</strong> ₱{application.package_cost}</p>
+        <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
+        <p className="capitalize"><strong>Status:</strong> {application.application_status}</p>
+        <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
+
+        {application.application_status === 'approved' && (
           <p>
-            <strong>Remaining Session:</strong>{' '}
+            <strong>Remaining Sessions:</strong>{' '}
             <span className="font-bold text-red-600">
               {application.remaining_sessions - selectedDates.length}
             </span>
           </p>
-
-          
-          <div className="mt-6">
-            {!showCalendar ? (
-              <button
-                onClick={() => setShowCalendar(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Book Session Dates
-              </button>
-            ) : (
-              <div className="mt-4">
-
-                <div className="flex items-start gap-8">
-                  <h3 className="text-lg font-semibold mb-2">Select Dates for Sessions</h3>
-                  {/* <h3 className="text-lg font-semibold mb-2">Legend: </h3> */}
-
-                  <div className="flex gap-4 mt-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <span><strong>Legend:</strong> </span>
-                    <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                    <span>Selected</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-yellow-100 border border-yellow-400 rounded"></div>
-                    <span>Pending</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-green-100 border border-green-400 rounded"></div>
-                    <span>Scheduled</span>
-                  </div>
-                  {/* <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-red-100 border border-red-400 rounded"></div>
-                    <span>Cancelled</span>
-                  </div> */}
-                </div>
-                </div>
-                
-                <div className="flex justify-between items-center mb-4">
-                
-                  <button 
-                    onClick={() => handleMonthChange(-1)}
-                    className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    &lt; Prev
-                  </button>
-                  <h4 className="text-xl font-bold">
-                    {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                  </h4>
-                  <button 
-                    onClick={() => handleMonthChange(1)}
-                    className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Next &gt;
-                  </button>
-                </div>
-
-                  {/* WeekDay Selector */}
-                <div className="grid grid-cols-7 gap-1 mb-4">
-                  {weekdays.map((day, index) => (
-                    <div key={day} className="text-center font-semibold p-1 text-sm">
-                      <button
-                        key={day}
-                        onClick={() => handleWeekdaySelect(index)}
-                        className={`px-2 py-1 text-sm rounded ${
-                          selectedWeekday === index ? 'bg-blue-200 font-semibold' : 'hover:bg-gray-100'
-                        }`}
-                      >
-                        {day.substring(0, 3)}
-                      </button>
-                    </div>
-                  ))}
-                  {renderCalendar()}
-                </div>
-
-                {selectedDates.length > 0 && (
-                  <div className="mb-4">
-                    <p className="font-semibold">Selected Dates ({selectedDates.length}):</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {selectedDates
-                        .sort()
-                        .map(date => (
-                          <span 
-                            key={date} 
-                            className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm"
-                          >
-                            {new Date(date).toLocaleDateString()}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setShowCalendar(false);
-                      setSelectedDates([]);
-                      setSelectedWeekday(null);
-                    }}
-                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSessionBooking}
-                    disabled={selectedDates.length === 0}
-                    className={`px-4 py-2 rounded text-white ${
-                      selectedDates.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-                    }`}
-                  >
-                    Confirm {selectedDates.length} Session{selectedDates.length !== 1 ? 's' : ''}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="mt-4 w-full bg-white p-6 rounded-lg shadow-lg border border-gray-300">
-        <h2 className="text-2xl font-bold text-green-600 mb-4">Application Details</h2>
-        <p><strong>Application ID:</strong> {application.id}</p>
-        <p><strong>Package:</strong> {application.package_name}</p>
-        <p><strong>Tutor:</strong> 
-          {application.tutor_fname} 
-          {application.tutor_lname}
-          {application.gender === "male" && <span title="Male">♂️</span>}
-          {application.gender === "female" && <span title="Female">♀️</span>}    
-        </p>
-        <p><strong>Timeslot:</strong> {formatTime12h(application.snapshot_start_time)} - {formatTime12h(application.snapshot_end_time)}</p>
-        <p className='capitalize'><strong>Status:</strong> {application.application_status}</p>
-        <p><strong>Date Applied:</strong> {new Date(application.created_at).toLocaleDateString()}</p>
-        
-        <div className="mt-4">
-          {application.application_status === 'pending' ? (
-            <>
-              <p className="text-yellow-700 font-semibold">Please submit payment proof before the deadline.</p>
-                    <CountdownTimer
-                      deadline={application.deadline}
-                      onExpire={async () => {
-                        try {
-                          await apiService.post(`/applications/expire/${application.id}`);
-                          setHasExpired(true);
-                          setApplication(null);
-                          setPaymentProof(null);
-                          await fetchApplication(); // Re-fetch updated state
-                        } catch (error) {
-                          console.error("Error expiring application:", error);
-                        }
-                      }}
-                    />
-              <form onSubmit={handlePaymentSubmit} encType="multipart/form-data" className="mt-4">
-                <input
-                  type="file"
-                  name="payment_proof"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  required
-                  className="mb-2"
-                />
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Submit Payment Proof
-                </button>
-                <button
-                  onClick={confirmCancel}
-                  className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded"
-                >
-                  Cancel Application
-                </button>
-              </form>
-            </>
-          ) : (
-            <div className="mt-4">
-              <p className="text-green-700 font-semibold">Payment proof submitted and awaiting review.</p>
-              {application.payment_proof && (
-                <div className="mt-2">
-                  <button
-                    onClick={previewPaymentProof}
-                    className="text-blue-600 underline hover:text-blue-800"
-                  >
-                    View Payment Proof
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    );
-  };
+    </div>
+  );
+
+  // const renderApprovedSection = () => (
+  //   <div className={baseCardClass}>
+  //     {/* {!showCalendar ? (
+  //       <button
+  //         onClick={() => setShowCalendar(true)}
+  //         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+  //       >
+  //         Book Session Dates
+  //       </button>
+  //     ) : (
+  //       <div className="mt-4">
+  //         <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
+  //           <h3 className="text-lg font-semibold">Select Dates for Sessions</h3>
+  //           <div className="flex gap-4 text-sm items-center">
+  //             <span className="font-medium">Legend:</span>
+  //             <Legend color="bg-blue-500" label="Selected" />
+  //             <Legend color="bg-yellow-100 border border-yellow-400" label="Pending" />
+  //             <Legend color="bg-green-100 border border-green-400" label="Scheduled" />
+  //           </div>
+  //         </div>
+
+  //         <div className="flex justify-between items-center mb-4">
+  //           <button onClick={() => handleMonthChange(-1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">&lt; Prev</button>
+  //           <h4 className="text-xl font-bold">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h4>
+  //           <button onClick={() => handleMonthChange(1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next &gt;</button>
+  //         </div>
+
+  //         <div className="grid grid-cols-7 gap-1 mb-4">
+  //           {weekdays.map((day, index) => (
+  //             <button
+  //               key={day}
+  //               onClick={() => handleWeekdaySelect(index)}
+  //               className={`text-sm px-2 py-1 rounded font-semibold ${
+  //                 selectedWeekday === index ? 'bg-blue-200' : 'hover:bg-gray-100'
+  //               }`}
+  //             >
+  //               {day.substring(0, 3)}
+  //             </button>
+  //           ))}
+  //           {renderCalendar()}
+  //         </div>
+
+  //         {selectedDates.length > 0 && (
+  //           <div className="mb-4">
+  //             <p className="font-semibold">Selected Dates ({selectedDates.length}):</p>
+  //             <div className="flex flex-wrap gap-2 mt-2">
+  //               {selectedDates.sort().map(date => (
+  //                 <span key={date} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+  //                   {new Date(date).toLocaleDateString()}
+  //                 </span>
+  //               ))}
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         <div className="flex gap-2 mt-4">
+  //           <button
+  //             onClick={() => {
+  //               setShowCalendar(false);
+  //               setSelectedDates([]);
+  //               setSelectedWeekday(null);
+  //             }}
+  //             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+  //           >
+  //             Cancel
+  //           </button>
+  //           <button
+  //             onClick={handleSessionBooking}
+  //             disabled={selectedDates.length === 0}
+  //             className={`px-4 py-2 rounded text-white ${
+  //               selectedDates.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+  //             }`}
+  //           >
+  //             Confirm {selectedDates.length} Session{selectedDates.length !== 1 ? 's' : ''}
+  //           </button>
+  //         </div>
+  //       </div>
+  //     )} */}
+  //   </div>
+  // );
+
+  const renderPendingSection = () => (
+    <div className={baseCardClass}>
+      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded mb-4">
+        <p className="font-semibold">Please submit your payment proof before the deadline.</p>
+      </div>
+
+      <CountdownTimer
+        deadline={application.deadline}
+        onExpire={async () => {
+          try {
+            await apiService.post(`/applications/expire/${application.id}`);
+            setHasExpired(true);
+            setApplication(null);
+            setPaymentProof(null);
+            await fetchApplication();
+          } catch (error) {
+            console.error("Error expiring application:", error);
+          }
+        }}
+      />
+
+      <form onSubmit={handlePaymentSubmit} encType="multipart/form-data" className="bg-white p-4 rounded shadow space-y-4 mt-4">
+        <div>
+          <label className="block font-medium mb-1">Upload Payment Proof</label>
+          <input
+            type="file"
+            name="payment_proof"
+            accept="image/*"
+            onChange={handleFileChange}
+            required
+            className="w-full border rounded px-3 py-2"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row justify-end gap-4">
+          <button
+            type="submit"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded"
+          >
+            Submit Payment Proof
+          </button>
+          <button
+            type="button"
+            onClick={confirmCancel}
+            className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded"
+          >
+            Cancel Application
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
+  const renderSubmittedSection = () => (
+    <div className={baseCardClass}>
+      <div className="bg-green-100 border-l-4 border-green-500 text-green-800 p-4 rounded">
+        <p className="font-semibold mb-2">
+          Your payment proof has been successfully submitted.
+          Please allow a minimum of 12 hours for the administrative team to review and confirm your submission.
+        </p>
+        {application.payment_proof && (
+          <button
+            onClick={previewPaymentProof}
+            className="text-blue-700 underline hover:text-blue-900"
+          >
+            View Payment Proof
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {renderCommonDetails()}
+      {application.application_status === 'approved'}
+      {application.application_status === 'pending' && renderPendingSection()}
+      {['submitted', 'expired', 'cancelled', 'done'].includes(application.application_status) && renderSubmittedSection()}
+    </>
+  );
+};
+
+const shouldHideApplyButton = (status) => {
+  const hiddenStatuses = ['pending', 'submitted', 'approved'];
+  return hiddenStatuses.includes(status?.toLowerCase());
+};
 
   return (
     <>
@@ -713,22 +728,50 @@ const handleWeekdaySelect = (weekdayIndex) => {
       <div className="h-24" />
 
       <div className="max-w-6xl mx-auto p-6">
-        <div className="items-center justify-center flex flex-col w-full max-w-7xl mx-auto px-4">
-          <h1 className="text-3xl font-bold mb-10 text-center">Apply for Tutorial Service</h1>
+        <div className="max-w-6xl mx-auto p-8 bg-white rounded-xl shadow-lg font-sans">
+          <h2 className="text-2xl font-bold mb-6">
+            {tab === 'package' ? 'Package Selection' : tab === 'application' ? 'Application Details' : tab === 'booking' ? 'Select Dates for your Tutorial Sessions' : 'Title'}
+          </h2>
+
+          {/* Tabs */}
+          <div className="flex space-x-6 border-b mb-6">
+            <button onClick={() => setTab('package')} className={`pb-2 ${tab === 'package' ? 'border-b-4 border-cyan-500 font-semibold text-cyan-500' : ''}`}>Package</button>
+            <button onClick={() => setTab('application')} className={`pb-2 ${tab === 'application' ? 'border-b-4 border-cyan-500 font-semibold text-cyan-500' : ''}`}>Application</button>
+            <button onClick={() => setTab('booking')} className={`pb-2 ${tab === 'booking' ? 'border-b-4 border-cyan-500 font-semibold text-cyan-500' : ''}`}>Book Dates</button>
+          </div>
           
-          {shouldShowApplication && renderApplicationDetails()}
 
-          {wasCancelled ? (
-            <div className="mt-4 mb-8 w-full p-4 bg-red-100 border border-red-400 text-red-800 rounded">
-              Your application has been <strong>cancelled</strong>. Please select a new package to start again.
-            </div>
-          ) : hasExpired ? (
-            <div className="mt-4 mb-8 w-full p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
-              Your application has expired. Please select a new package and try again.
-            </div>
-          ) : null}
+{tab === 'application' && (
+  <>
+    {wasCancelled ? (
+      <div className="mt-4 mb-8 w-full p-4 bg-red-100 border border-red-400 text-red-800 rounded">
+        Your application has been <strong>cancelled</strong>. Please select a new package to start again.
+      </div>
+    ) : hasExpired ? (
+      <div className="mt-4 mb-8 w-full p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
+        Your application has expired. Please select a new package and try again.
+      </div>
+    ) : isDone ? (
+      <div className="mt-4 mb-8 w-full p-4 bg-green-100 border border-green-400 text-green-800 rounded">
+        Your application has been <strong>completed</strong>. You can now select another package!
+      </div>
+    ) : null}
 
-          {(!application || hasExpired || isDone ) && (
+    {shouldShowApplication ? (
+      renderApplicationDetails()
+    ) : (
+      // Show this if there's truly no application
+      !wasCancelled && !hasExpired && !isDone && (
+        <div className="mt-4 mb-8 w-full p-4 bg-gray-100 border border-gray-400 text-gray-800 rounded">
+          You have no current application. Please select a package to get started.
+        </div>
+      )
+    )}
+  </>
+)}
+          {tab === 'package' && (
+            <>
+            {(!application || application || hasExpired || isDone ) && (
             loading ? (
               <p>Loading Available Packages...</p>
             ) : error ? (
@@ -749,20 +792,120 @@ const handleWeekdaySelect = (weekdayIndex) => {
                       <p className="text-lg mb-2 capitalize"><strong>Tutorial Type:</strong> {pkg.tutorial_type}</p>
                       <p className="text-sm text-gray-600">{pkg.description}</p>
                     </div>
-                    <button
-                      onClick={() => handleApplyClick(pkg)}
-                      className="mt-6 px-6 py-3 bg-blue-600 text-white font-medium text-lg rounded-xl hover:bg-blue-700"
-                    >
-                      Apply
-                    </button>
+                    {/* <p className="text-sm text-gray-600">Current status: {applicationStatus} </p> */}
+                    {!shouldHideApplyButton(applicationStatus) && (
+                      
+                      <button
+                        onClick={() => handleApplyClick(pkg)}
+                        className="mt-6 px-6 py-3 bg-blue-600 text-white font-medium text-lg rounded-xl hover:bg-blue-700"
+                      >
+                        Apply
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-            )
+              )
+            )}
+            </>
+          )}
+          {tab === 'booking' && (
+            <div className="mt-6">
+              {/* <h3 className="text-xl font-semibold mb-4">Book Dates for Your Sessions</h3> */}
+              {application ? (
+                <>
+                  {application.application_status === 'approved' ? (
+        <div className="mt-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
+            {/* <h3 className="text-lg font-semibold">Select Dates for your Tutorial Sessions</h3> */}
+            <div className="flex gap-4 text-sm items-center">
+              <span className="font-medium">Legend:</span>
+              <Legend color="bg-blue-500" label="Selected" />
+              <Legend color="bg-yellow-100 border border-yellow-400" label="Pending" />
+              <Legend color="bg-green-100 border border-green-400" label="Scheduled" />
+            </div>
+            <div>
+              <p>
+                <strong>Remaining Sessions:</strong>{' '}
+                <span className="font-bold text-red-600">
+                  {application.remaining_sessions - selectedDates.length}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center mb-4">
+            <button onClick={() => handleMonthChange(-1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">&lt; Prev</button>
+            <h4 className="text-xl font-bold">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h4>
+            <button onClick={() => handleMonthChange(1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next &gt;</button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 mb-4">
+            {weekdays.map((day, index) => (
+              <button
+                key={day}
+                onClick={() => handleWeekdaySelect(index)}
+                className={`text-sm px-2 py-1 rounded font-semibold ${
+                  selectedWeekday === index ? 'bg-blue-200' : 'hover:bg-gray-100'
+                }`}
+              >
+                {day.substring(0, 3)}
+              </button>
+            ))}
+            {renderCalendar()}
+          </div>
+
+          {selectedDates.length > 0 && (
+            <div className="mb-4">
+              <p className="font-semibold">Selected Dates ({selectedDates.length}):</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedDates.sort().map(date => (
+                  <span key={date} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                    {new Date(date).toLocaleDateString()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => {
+                setShowCalendar(false);
+                setSelectedDates([]);
+                setSelectedWeekday(null);
+              }}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSessionBooking}
+              disabled={selectedDates.length === 0}
+              className={`px-4 py-2 rounded text-white ${
+                selectedDates.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              Confirm {selectedDates.length} Session{selectedDates.length !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+                  ) : (
+                            <div className="mt-4 mb-8 w-full p-4 bg-gray-100 border border-gray-400 text-gray-800 rounded">
+                                Please apply for a package first to book dates.
+                            </div>
+                  )}
+                </>
+              ) : (
+                            <div className="mt-4 mb-8 w-full p-4 bg-gray-100 border border-gray-400 text-gray-800 rounded">
+                                Please apply for a package first to book dates.
+                            </div>
+              )}
+            </div>
           )}
         </div>
       </div>
-
+{/* Package Application Modal */}
       {showModal && (!application || hasExpired) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg relative">
@@ -774,7 +917,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
             </button>
 
             <h2 className="text-xl font-bold mb-4">Apply for: {selectedPackage?.package_name}</h2>
-
+{/* Tutor Selection */}
             <div className="mb-4">
               <label className="block font-medium mb-1">Select Tutor</label>
               <select
@@ -791,56 +934,56 @@ const handleWeekdaySelect = (weekdayIndex) => {
               </select>
             </div>
 
-{selectedTutor && (
-  <div className="border rounded p-4 mb-4 bg-gray-50 flex items-center gap-4">
-    {selectedTutor.profile_image_url && (
-      <img
-        src={`http://localhost:5000/uploads/${selectedTutor.profile_image_url}`}
-        alt="Profile"
-        className="w-40 h-40 object-cover rounded-full border"
-      />
-    )}
-    <div>
-      <p className="flex items-center gap-1">
-        <strong>Name:</strong>&nbsp;
-        {selectedTutor.fname} {selectedTutor.lname}
-        {selectedTutor.gender === "male" && <span title="Male">♂️</span>}
-        {selectedTutor.gender === "female" && <span title="Female">♀️</span>}
-      </p>
-      
-      {/* ⭐ Average Rating Display */}
-      <p className="flex items-center gap-1">
-        <strong>Ratings<span role="img" aria-label="star">⭐</span>&nbsp;:</strong>&nbsp;
-        {selectedTutor.average_rating !== null ? (
-          <>
-            {Number(selectedTutor.average_rating).toFixed(1)}&nbsp;
+            {selectedTutor && (
+              <div className="border rounded p-4 mb-4 bg-gray-50 flex items-center gap-4">
+                {selectedTutor.profile_image_url && (
+                  <img
+                    src={`http://localhost:5000/uploads/${selectedTutor.profile_image_url}`}
+                    alt="Profile"
+                    className="w-40 h-40 object-cover rounded-full border"
+                  />
+                )}
+                <div>
+                  <p className="flex items-center gap-1">
+                    <strong>Name:</strong>&nbsp;
+                    {selectedTutor.fname} {selectedTutor.lname}
+                    {selectedTutor.gender === "male" && <span title="Male">♂️</span>}
+                    {selectedTutor.gender === "female" && <span title="Female">♀️</span>}
+                  </p>
+                  
+                  {/* ⭐ Average Rating Display */}
+                  <p className="flex items-center gap-1">
+                    <strong>Ratings<span role="img" aria-label="star">⭐</span>&nbsp;:</strong>&nbsp;
+                    {selectedTutor.average_rating !== null ? (
+                      <>
+                        {Number(selectedTutor.average_rating).toFixed(1)}&nbsp;
 
-            out of {selectedTutor.total_reviews}&nbsp;
-            {selectedTutor.total_reviews === 1 ? 'review' : 'reviews'}
-          </>
-        ) : (
-          <span>No ratings yet</span>
-        )}
-      </p>
+                        out of {selectedTutor.total_reviews}&nbsp;
+                        {selectedTutor.total_reviews === 1 ? 'review' : 'reviews'}
+                      </>
+                    ) : (
+                      <span>No ratings yet</span>
+                    )}
+                  </p>
 
-      {selectedTutor.certification && <p><strong>Certification:</strong> {selectedTutor.certification}</p>}
-      {selectedTutor.subject && <p><strong>Specialization:</strong> {selectedTutor.subject}</p>}
-      {selectedTutor.teaching_lvl && <p><strong>Academic Level:</strong> {selectedTutor.teaching_lvl}</p>}
-      {selectedTutor.experiences && <p><strong>Experiences:</strong> {selectedTutor.experiences}</p>}
-      {selectedTutor.graduate_at && <p><strong>Graduate At:</strong> {selectedTutor.graduate_at}</p>}
-    </div>
-  </div>
-)}
-
-            <div className="mb-4">
-              <label className="block font-medium mb-1">Select Timeslot</label>
+                  {selectedTutor.certification && <p><strong>Certification:</strong> {selectedTutor.certification}</p>}
+                  {selectedTutor.subject && <p><strong>Specialization:</strong> {selectedTutor.subject}</p>}
+                  {selectedTutor.teaching_lvl && <p><strong>Academic Level:</strong> {selectedTutor.teaching_lvl}</p>}
+                  {selectedTutor.experiences && <p><strong>Experiences:</strong> {selectedTutor.experiences}</p>}
+                  {selectedTutor.graduate_at && <p><strong>Graduate At:</strong> {selectedTutor.graduate_at}</p>}
+                </div>
+              </div>
+            )}
+{/* Timeslot Selection */}
+            <div className="mb-4 flex items-center gap-4">
+              <label className="w-40 font-medium">Select Timeslot</label>
               {loadingTimeslots ? (
                 <p>Loading available timeslots...</p>
               ) : (
                 <select
                   value={selectedSlot}
                   onChange={(e) => setSelectedSlot(e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
+                  className="flex-1 border px-3 py-2 rounded"
                   disabled={timeslots.length === 0}
                 >
                   <option value="">-- Select Timeslot --</option>
@@ -852,7 +995,22 @@ const handleWeekdaySelect = (weekdayIndex) => {
                 </select>
               )}
             </div>
+            {/* Payment Option */}
+            <div className="mb-4 flex items-center gap-4">
+              <label className="w-40 font-medium">Payment Option</label>
+              <select
+                value={paymentType}
+                onChange={(e) => setPaymentType(e.target.value)}
+                className="flex-1 border px-3 py-2 rounded"
+                disabled={timeslots.length === 0}
+              >
+                <option value="">-- Select Payment Type --</option>
+                <option value="full">Full Payment</option>
+                <option value="partial">Partial Payment</option>
+              </select>
+            </div>
 
+          {/* Package Application Buttons */}
             <div className="flex justify-end gap-4">
               <button
                 onClick={() => setShowModal(false)}
@@ -871,20 +1029,20 @@ const handleWeekdaySelect = (weekdayIndex) => {
         </div>
       )}
 
-      {alert.show && (
-        <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
-          fadeOut ? 'opacity-0' : 'opacity-100'
-          }`}
-        >
-          <Alert
-            severity={alert.severity}
-            onClose={() => setAlert({ ...alert, show: false })}
-            variant="filled"
+    {alert.show && (
+          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+            fadeOut ? 'opacity-0' : 'opacity-100'
+            }`}
           >
-            {alert.message}
-          </Alert>
-        </div>
-      )}
+            <Alert
+              severity={alert.severity}
+              onClose={() => setAlert({ ...alert, show: false })}
+              variant="filled"
+            >
+              {alert.message}
+            </Alert>
+          </div>
+        )}
 
       {confirmCancelOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">

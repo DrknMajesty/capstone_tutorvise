@@ -8,21 +8,22 @@ exports.getMyApplication = async (req, res) => {
   try {
     // 1. Fetch the latest application for the student
     const [apps] = await db.query(`
-      SELECT 
-        a.*, 
-        p.package_name, 
-        p.price_package, 
-        p.total_sessions,
-        t.gender,
-        t.fname AS tutor_fname, 
-        t.lname AS tutor_lname
-      FROM applications a
-      JOIN packages p ON a.package_id = p.id
-      JOIN users t ON a.tutor_id = t.id
-      WHERE a.student_id = ? 
-        AND a.application_status IN ('Pending', 'Expired', 'Submitted', 'Approved', 'Cancelled', 'Done')
-      ORDER BY a.created_at DESC
-      LIMIT 1;
+SELECT 
+  a.*, 
+  a.package_cost,
+  a.paymentType,
+  p.package_name,
+  p.total_sessions,
+  t.gender,
+  t.fname AS tutor_fname, 
+  t.lname AS tutor_lname
+FROM applications a
+JOIN users t ON a.tutor_id = t.id
+JOIN packages p ON a.package_id = p.id
+WHERE a.student_id = ? 
+  AND a.application_status IN ('pending', 'expired', 'submitted', 'approved', 'cancelled', 'done')
+ORDER BY a.created_at DESC
+LIMIT 1;
     `, [studentId]);
 
     if (apps.length === 0) {
@@ -156,16 +157,29 @@ exports.cancelApplication = async (req, res) => {
 exports.getSubmittedApplications = async (req, res) => {
   try {
     const query = `
-      SELECT a.*, 
-             p.package_name, p.price_package, p.total_sessions, p.price_sessions,
-             s.fname AS student_fname, s.lname AS student_lname,
-             t.fname AS tutor_fname, t.lname AS tutor_lname
-      FROM applications a
-      JOIN packages p ON a.package_id = p.id
-      JOIN users s ON a.student_id = s.id
-      JOIN users t ON a.tutor_id = t.id
-      WHERE a.application_status IN ('Pending', 'Approved', 'Cancelled', 'Submitted')
-      ORDER BY a.created_at DESC
+SELECT a.*, 
+       p.package_name, p.price_package, p.total_sessions, p.price_sessions,
+       s.fname AS student_fname, s.lname AS student_lname,
+       t.fname AS tutor_fname, t.lname AS tutor_lname
+FROM applications a
+JOIN packages p ON a.package_id = p.id
+JOIN users s ON a.student_id = s.id
+JOIN users t ON a.tutor_id = t.id
+WHERE a.application_status IN ('Submitted', 'Approved', 'Done')
+ORDER BY 
+  CASE a.application_status
+    WHEN 'Submitted' THEN 1
+    WHEN 'Approved' THEN 2
+    WHEN 'Done' THEN 3
+  END,
+  CASE 
+    WHEN a.application_status = 'Submitted' THEN a.created_at
+    ELSE NULL
+  END ASC,
+  CASE 
+    WHEN a.application_status IN ('Approved', 'Done') THEN a.created_at
+    ELSE NULL
+  END DESC;
     `;
     const [rows] = await db.query(query);
     res.status(200).json(rows);

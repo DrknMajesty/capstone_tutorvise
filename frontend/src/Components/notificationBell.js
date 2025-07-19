@@ -1,27 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import apiService from '../utils/apiService';
 
 const NotificationBell = ({ userId }) => {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data } = await apiService.get(`/notifications/${userId}`);
       setNotifications(data);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
-    if (userId) fetchNotifications();
-  }, [userId]);
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   useEffect(() => {
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 

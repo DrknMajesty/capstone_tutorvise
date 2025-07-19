@@ -9,11 +9,16 @@ const login = async (req, res) => {
 
   try {
     const user = await userModel.getUserByUsername(username);
+    // console.log("User fetched for login:", user);
+    console.log("User fetched for login:", username);
+    
     if (!user) {
       return res.status(400).json({ message: 'Invalid experiences' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
+    console.log("Password match status:", passwordMatch);
+
     if (!passwordMatch) {
       return res.status(400).json({ message: 'Invalid experiences' });
     }

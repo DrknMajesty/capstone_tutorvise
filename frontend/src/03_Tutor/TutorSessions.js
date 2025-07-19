@@ -98,11 +98,11 @@ const TutorSessionsPage = () => {
 
       await apiService.put(`/sessions/${sessionId}/status/request`, { status: action });
 
-      setSessions(prev =>
-        prev.map(s =>
-          s.session_id === sessionId ? { ...s, status: action } : s
-        )
-      );
+      // setSessions(prev =>
+      //   prev.map(s =>
+      //     s.session_id === sessionId ? { ...s, status: action } : s
+      //   )
+      // );
 
       setAlert({
         message: `Status request: ${action} submitted.`,

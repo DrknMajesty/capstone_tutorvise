@@ -188,10 +188,12 @@ exports.updateUser = async (req, res) => {
       });
     }
 
+    const shouldUpdatePassword = password && password.trim().length > 0;
+
     let userUpdateQuery = `
       UPDATE users SET
         username = ?,
-        ${password ? 'password = ?,' : ''}
+        ${shouldUpdatePassword ? 'password = ?,' : ''}
         fname = ?,
         mname = ?,
         lname = ?,
@@ -204,7 +206,7 @@ exports.updateUser = async (req, res) => {
 
     const params = [
       username,
-      ...(password ? [await bcrypt.hash(password, 10)] : []),
+      ...(shouldUpdatePassword ? [await bcrypt.hash(password, 10)] : []),
       fname,
       mname || null,
       lname,
@@ -321,6 +323,67 @@ ORDER BY tp.subject DESC;
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Update user email
+exports.updateEmail = async (req, res) => {
+  const userId = req.params.id;
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required.' });
+  }
+
+  try {
+    // Check if email already exists for another user
+    const [existingUser] = await db.query(
+      'SELECT id FROM users WHERE email = ? AND id != ?',
+      [email, userId]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({ message: 'This email is already taken.' });
+    }
+
+    // Proceed to update
+    await db.query('UPDATE users SET email = ? WHERE id = ?', [email, userId]);
+    res.json({ message: 'Email updated successfully.' });
+
+  } catch (error) {
+    console.error('Error updating email:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+// Update user contact number
+exports.updateContactNumber = async (req, res) => {
+  const userId = req.params.id;
+  const { contact_no } = req.body;
+
+  if (!contact_no) {
+    return res.status(400).json({ message: 'Contact number is required.' });
+  }
+
+  try {
+    // Check if contact number already exists for another user
+    const [existingUser] = await db.query(
+      'SELECT id FROM users WHERE contact_no = ? AND id != ?',
+      [contact_no, userId]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({ message: 'This contact number is already taken.' });
+    }
+
+    // Proceed to update
+    await db.query('UPDATE users SET contact_no = ? WHERE id = ?', [contact_no, userId]);
+    res.json({ message: 'Contact number updated successfully.' });
+
+  } catch (error) {
+    console.error('Error updating contact number:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
