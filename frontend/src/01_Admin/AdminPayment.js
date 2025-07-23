@@ -86,6 +86,23 @@ const handleRejectPayment = async (paymentId) => {
 
   const formatCurrency = (amount_paid) => `₱${Number(amount_paid).toFixed(2)}`;
 
+  const formatTimeRange = (startTime, endTime) => {
+    const toLocalTime = (timeStr) => {
+      if (!timeStr) return 'Invalid time';
+      const today = new Date().toISOString().split('T')[0]; // e.g., "2025-07-23"
+      const dateObj = new Date(`${today}T${timeStr}`);
+      return isNaN(dateObj.getTime())
+        ? 'Invalid time'
+        : dateObj.toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          });
+    };
+
+    return `${toLocalTime(startTime)} - ${toLocalTime(endTime)}`;
+  };
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentApplications = applications.slice(indexOfFirstItem, indexOfLastItem);
@@ -115,7 +132,7 @@ const handleRejectPayment = async (paymentId) => {
                   <div>
                     <h2 className="text-lg font-semibold"> Application # {app.id} {app.student_fname} {app.student_lname}</h2>
                     <p className="text-sm text-gray-600">
-                      Package: {app.package_name} | Tutor: {app.tutor_fname} {app.tutor_lname} | Time: {app.snapshot_start_time} - {app.snapshot_end_time}
+                      Package: {app.package_name} | Tutor: {app.tutor_fname} {app.tutor_lname} | Time: {formatTimeRange(app.snapshot_start_time, app.snapshot_end_time)}
                     </p>
                     <p className="text-sm text-gray-500">
                       Submitted: {new Date(app.submitted_at).toLocaleString()}
