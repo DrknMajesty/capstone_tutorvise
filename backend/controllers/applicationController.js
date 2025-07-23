@@ -21,7 +21,7 @@ FROM applications a
 JOIN users t ON a.tutor_id = t.id
 JOIN packages p ON a.package_id = p.id
 WHERE a.student_id = ? 
-  AND a.application_status IN ('pending', 'expired', 'submitted', 'approved', 'cancelled', 'done')
+  AND a.application_status IN ('pending', 'expired', 'submitted', 'approved', 'cancelled', 'done', 'partially_paid')
 ORDER BY a.created_at DESC
 LIMIT 1;
     `, [studentId]);
@@ -76,33 +76,44 @@ exports.submitPaymentProof = async (req, res) => {
   }
 
   try {
-    // ✅ Update the application
-    await db.query(`
-      UPDATE applications 
-      SET payment_proof = ?, 
-          submitted_at = NOW(),
-          application_status = 'Submitted'
-      WHERE id = ?;
-    `, [paymentProof, applicationId]);
+    // ✅ Get the payment type from the application
+    const [[app]] = await db.query(
+      `SELECT paymentType, student_id, CONCAT(u.fname, ' ', u.lname) AS student_name
+       FROM applications a
+       JOIN users u ON a.student_id = u.id
+       WHERE a.id = ?`,
+      [applicationId]
+    );
 
-    // ✅ Get student info (optional)
-    const [[studentResult]] = await db.query(`
-      SELECT student_id, CONCAT(u.fname, ' ', u.lname) AS student_name
-      FROM applications a
-      JOIN users u ON a.student_id = u.id
-      WHERE a.id = ?;
-    `, [applicationId]);
+    if (!app) {
+      return res.status(404).json({ message: 'Application not found.' });
+    }
 
-    const studentName = studentResult?.student_name || 'A student';
-    const studentId = studentResult?.student_id;
+    // ✅ Check if the application payment type is partial or full
+    const isPartial = app.paymentType === 'partial';
+
+    // ✅ Save the payment proof in the payments table
+    await db.query(
+      `INSERT INTO payments (application_id, payment_proof, is_partial)
+       VALUES (?, ?, ?)`,
+      [applicationId, paymentProof, isPartial]
+    );
+
+    // ✅ Update application status to 'submitted' and mark submission time
+    await db.query(
+      `UPDATE applications 
+       SET submitted_at = NOW(), application_status = 'submitted'
+       WHERE id = ?`,
+      [applicationId]
+    );
 
     // ✅ Notify all admins
     const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'admin'`);
     for (const admin of admins) {
-      await createNotification(admin.id, `New application submitted by ${studentName}`);
+      await createNotification(admin.id, `New ${isPartial ? 'partial' : 'full'} payment proof submitted by ${app.student_name}`);
     }
 
-    res.json({ message: 'Payment proof submitted and admin notified.' });
+    res.json({ message: 'Payment proof submitted and awaiting admin approval.' });
   } catch (err) {
     console.error('Error uploading proof:', err);
     res.status(500).json({ message: 'Server error.' });
@@ -156,124 +167,203 @@ exports.cancelApplication = async (req, res) => {
 // Get all submitted applications
 exports.getSubmittedApplications = async (req, res) => {
   try {
-    const query = `
-SELECT a.*, 
-       p.package_name, p.price_package, p.total_sessions, p.price_sessions,
-       s.fname AS student_fname, s.lname AS student_lname,
-       t.fname AS tutor_fname, t.lname AS tutor_lname
-FROM applications a
-JOIN packages p ON a.package_id = p.id
-JOIN users s ON a.student_id = s.id
-JOIN users t ON a.tutor_id = t.id
-WHERE a.application_status IN ('Submitted', 'Approved', 'Done')
-ORDER BY 
-  CASE a.application_status
-    WHEN 'Submitted' THEN 1
-    WHEN 'Approved' THEN 2
-    WHEN 'Done' THEN 3
-  END,
-  CASE 
-    WHEN a.application_status = 'Submitted' THEN a.created_at
-    ELSE NULL
-  END ASC,
-  CASE 
-    WHEN a.application_status IN ('Approved', 'Done') THEN a.created_at
-    ELSE NULL
-  END DESC;
-    `;
-    const [rows] = await db.query(query);
-    res.status(200).json(rows);
+    // Step 1: Run SQL to get applications + user + package + payments (flat structure)
+    const [rows] = await db.query(`
+      SELECT 
+        a.*,
+        p.package_name, 
+        p.price_package, 
+        p.total_sessions, 
+        p.price_sessions,
+        s.fname AS student_fname, 
+        s.lname AS student_lname,
+        t.fname AS tutor_fname, 
+        t.lname AS tutor_lname,
+
+        pay.id AS payment_id,
+        pay.amount_paid,
+        pay.payment_date,
+        pay.payment_proof,
+        pay.is_partial,
+        pay.is_confirmed
+
+      FROM applications a
+      JOIN packages p ON a.package_id = p.id
+      JOIN users s ON a.student_id = s.id
+      JOIN users t ON a.tutor_id = t.id
+      LEFT JOIN payments pay ON pay.application_id = a.id
+
+      WHERE a.application_status IN ('Submitted', 'Approved', 'Done', 'Partially_paid')
+
+      ORDER BY 
+        CASE a.application_status
+          WHEN 'Submitted' THEN 1
+          WHEN 'Approved' THEN 2
+          WHEN 'Done' THEN 3
+        END,
+        CASE 
+          WHEN a.application_status = 'Submitted' THEN a.created_at
+          ELSE NULL
+        END ASC,
+        CASE 
+          WHEN a.application_status IN ('Approved', 'Done') THEN a.created_at
+          ELSE NULL
+        END DESC
+    `);
+
+    // Step 2: Group by application ID and attach payments
+    const applicationsMap = new Map();
+
+    for (const row of rows) {
+      const appId = row.id;
+
+      if (!applicationsMap.has(appId)) {
+        applicationsMap.set(appId, {
+          id: row.id,
+          student_id: row.student_id,
+          tutor_id: row.tutor_id,
+          package_id: row.package_id,
+          application_status: row.application_status,
+          submitted_at: row.submitted_at,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          paymentType: row.paymentType, // ✅ included here
+          snapshot_start_time: row.snapshot_start_time,
+          snapshot_end_time: row.snapshot_end_time,
+
+          // Student & tutor
+          student_fname: row.student_fname,
+          student_lname: row.student_lname,
+          tutor_fname: row.tutor_fname,
+          tutor_lname: row.tutor_lname,
+
+          // Package info
+          package_name: row.package_name,
+          price_package: row.price_package,
+          total_sessions: row.total_sessions,
+          price_sessions: row.price_sessions,
+
+          // Initialize payment list
+          payments: [],
+        });
+      }
+
+      // If there's payment data on this row, push it to the payments array
+      if (row.payment_id) {
+        applicationsMap.get(appId).payments.push({
+          id: row.payment_id,
+          amount_paid: row.amount_paid,
+          payment_date: row.payment_date,
+          payment_proof: row.payment_proof,
+          is_partial: row.is_partial,
+          is_confirmed: row.is_confirmed,
+        });
+      }
+    }
+
+    // Step 3: Return the grouped applications
+    const groupedApplications = Array.from(applicationsMap.values());
+    res.status(200).json(groupedApplications);
   } catch (err) {
     console.error('Error fetching submitted applications:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
+
+// Approve application
 exports.approveApplication = async (req, res) => {
   const connection = await db.getConnection();
   try {
-    const { id } = req.params;
+    const { id } = req.params; // id = payment.id
 
+    console.log('Approving payment with ID:', id);
     await connection.beginTransaction();
 
-    const [rows] = await db.query(
-      'SELECT * FROM applications WHERE id = ?',
+    // ✅ Step 1: Confirm the payment
+    await connection.query(
+      `UPDATE payments SET is_confirmed = TRUE WHERE id = ?`,
       [id]
     );
 
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'Application not found' });
-    }
-
-    const application = rows[0];
-
-    if (application.application_status !== 'submitted') {
-      return res.status(400).json({ message: 'Only pending applications can be cancelled' });
-    }
-
-    // Step 1: Update application status
-    const updateAppQuery = `
-      UPDATE applications
-      SET application_status = 'Approved',
-          expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
-      WHERE id = ?
-    `;
-    await connection.query(updateAppQuery, [id]);
-
-    // Step 2: Get timeslot_id, package_id, and student_id from the application
-    const [appRows] = await connection.query(
-      `SELECT timeslot_id, package_id, student_id FROM applications WHERE id = ?`,
+    // ✅ Step 2: Get the application_id linked to the payment
+    const [[payment]] = await connection.query(
+      `SELECT application_id FROM payments WHERE id = ?`,
       [id]
     );
+    if (!payment) throw new Error('Payment not found');
+    const applicationId = payment.application_id;
 
-    if (appRows.length === 0 || !appRows[0].timeslot_id) {
-      throw new Error('Timeslot not found for the application.');
+    // ✅ Step 3: Get application info
+    const [[application]] = await connection.query(
+      `SELECT paymentType, application_status, timeslot_id, student_id FROM applications WHERE id = ?`,
+      [applicationId]
+    );
+    if (!application) throw new Error('Application not found');
+
+    const { paymentType, application_status, timeslot_id, student_id } = application;
+
+    // ✅ Step 4: Get number of confirmed payments
+    const [[{ confirmedCount }]] = await connection.query(
+      `SELECT COUNT(*) AS confirmedCount
+       FROM payments
+       WHERE application_id = ? AND is_confirmed = TRUE`,
+      [applicationId]
+    );
+
+    if (paymentType === 'full') {
+      // ✅ Full payment — directly approve
+      await connection.query(
+        `UPDATE applications 
+         SET application_status = 'approved',
+             expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
+         WHERE id = ?`,
+        [applicationId]
+      );
+
+      await connection.query(`UPDATE timeslots SET status = 'booked' WHERE id = ?`, [timeslot_id]);
+
+      await createNotification(student_id, `Your application #${applicationId} has been approved. You have 30 days to book dates for your tutorial sessions.`);
+
+    } else if (paymentType === 'partial') {
+      if (confirmedCount === 1 && application_status === 'submitted') {
+        // ✅ Initial payment confirmed — mark partially_paid, book slot, notify
+        await connection.query(
+          `UPDATE applications 
+           SET application_status = 'partially_paid'
+           WHERE id = ?`,
+          [applicationId]
+        );
+
+        await connection.query(`UPDATE timeslots SET status = 'booked' WHERE id = ?`, [timeslot_id]);
+
+        await createNotification(student_id, `Initial payment for application #${applicationId} confirmed. You may now book your tutorial session dates.`);
+
+      } else if (confirmedCount >= 2 && application_status === 'partially_paid') {
+        // ✅ Final payment confirmed — mark fully approved
+        await connection.query(
+          `UPDATE applications 
+           SET application_status = 'approved',
+               expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
+           WHERE id = ?`,
+          [applicationId]
+        );
+
+        await createNotification(student_id, `Final payment for application #${applicationId} confirmed. You now have 30 days to complete your tutorial sessions.`);
+      }
     }
-
-    const { timeslot_id: timeslotId, package_id: packageId, student_id: studentId } = appRows[0];
-
-    // Step 3: Get package details
-    const [packageRows] = await connection.query(
-      `SELECT price_package, total_sessions, price_sessions FROM packages WHERE id = ?`,
-      [packageId]
-    );
-
-    if (packageRows.length === 0) {
-      throw new Error('Package not found.');
-    }
-
-    const pricePackage = parseFloat(packageRows[0].price_package);
-    const totalSessions = parseInt(packageRows[0].total_sessions);
-    const pricePerSession = parseFloat(packageRows[0].price_sessions);
-
-    const amountPaid = Number((pricePackage + totalSessions * pricePerSession).toFixed(2));
-
-    // Step 4: Update timeslot status
-    await connection.query(
-      `UPDATE timeslots SET status = 'booked' WHERE id = ?`,
-      [timeslotId]
-    );
-
-    // Step 5: Insert payment record
-    await connection.query(
-      `INSERT INTO payments (application_id, amount_paid, payment_date) VALUES (?, ?, NOW())`,
-      [id, amountPaid]
-    );
-
-    // ✅ Step 6: Create notification
-    await createNotification(application.student_id,`Your application #${id} has been approved. You have 30 days to booked dates for tutorial.`);
 
     await connection.commit();
-    res.status(200).json({ message: 'Application approved, timeslot booked, and payment recorded.' });
+    res.status(200).json({ message: 'Payment confirmed and application updated accordingly.' });
+
   } catch (err) {
     if (connection) await connection.rollback();
-    console.error('Error approving application:', err);
-    res.status(500).json({ message: 'Failed to approve application.' });
+    console.error('Error approving payment:', err);
+    res.status(500).json({ message: 'Failed to approve payment.' });
   } finally {
     if (connection) connection.release();
   }
 };
-
 
 
 // Reject application

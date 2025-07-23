@@ -510,7 +510,8 @@ const CountdownTimer = ({ deadline, onExpire }) => {
                                application.application_status === 'submitted' || 
                                application.application_status === 'approved' || 
                                application.application_status === 'done' ||
-                               application.application_status === 'cancelled'
+                               application.application_status === 'cancelled' ||
+                               application.application_status === 'partially_paid'
                               ) && 
                               !hasExpired;
 
@@ -551,9 +552,47 @@ const renderApplicationDetails = () => {
             </span>
           </p>
         )}
+
+        <p className="capitalize">
+          <strong>Payment Type:</strong> {application.paymentType || 'N/A'}
+        </p>
       </div>
     </div>
   );
+
+  const renderPartialPaymentSection = () => (
+  <div className={baseCardClass}>
+    <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-900 p-4 rounded mb-4">
+      <p className="font-semibold mb-2">
+        Your initial partial payment was approved.
+        Please upload the final payment proof to complete your application.
+      </p>
+      <p><strong>Remaining Amount:</strong> ₱{(application.package_cost - (application.amount_paid || 0)).toFixed(2)}</p>
+    </div>
+
+    <form onSubmit={handlePaymentSubmit} encType="multipart/form-data" className="bg-white p-4 rounded shadow space-y-4 mt-4">
+      <div>
+        <label className="block font-medium mb-1">Upload Final Payment Proof</label>
+        <input
+          type="file"
+          name="payment_proof"
+          accept="image/*"
+          onChange={handleFileChange}
+          required
+          className="w-full border rounded px-3 py-2"
+        />
+      </div>
+      <div className="flex flex-col sm:flex-row justify-end gap-4">
+        <button
+          type="submit"
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded"
+        >
+          Submit Final Proof
+        </button>
+      </div>
+    </form>
+  </div>
+);
 
   // const renderApprovedSection = () => (
   //   <div className={baseCardClass}>
@@ -713,6 +752,8 @@ const renderApplicationDetails = () => {
       {application.application_status === 'approved'}
       {application.application_status === 'pending' && renderPendingSection()}
       {['submitted', 'expired', 'cancelled', 'done'].includes(application.application_status) && renderSubmittedSection()}
+      {application.paymentType === 'partial' && application.application_status === 'approved' && renderPartialPaymentSection()}
+      {/* {application.application_status === 'partially_paid' && renderPartialPaymentSection()} */}
     </>
   );
 };
@@ -722,6 +763,8 @@ const shouldHideApplyButton = (status) => {
   return hiddenStatuses.includes(status?.toLowerCase());
 };
 
+
+// JSX display mao ni ma display sa UI
   return (
     <>
       <ResponsiveNavbar />
@@ -814,7 +857,7 @@ const shouldHideApplyButton = (status) => {
               {/* <h3 className="text-xl font-semibold mb-4">Book Dates for Your Sessions</h3> */}
               {application ? (
                 <>
-                  {application.application_status === 'approved' ? (
+                  {['approved', 'partially_paid'].includes(application.application_status) ? (
         <div className="mt-4">
           <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
             {/* <h3 className="text-lg font-semibold">Select Dates for your Tutorial Sessions</h3> */}
