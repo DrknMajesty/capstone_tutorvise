@@ -8,22 +8,22 @@ exports.getMyApplication = async (req, res) => {
   try {
     // 1. Fetch the latest application for the student
     const [apps] = await db.query(`
-SELECT 
-  a.*, 
-  a.package_cost,
-  a.paymentType,
-  p.package_name,
-  p.total_sessions,
-  t.gender,
-  t.fname AS tutor_fname, 
-  t.lname AS tutor_lname
-FROM applications a
-JOIN users t ON a.tutor_id = t.id
-JOIN packages p ON a.package_id = p.id
-WHERE a.student_id = ? 
-  AND a.application_status IN ('pending', 'expired', 'submitted', 'approved', 'cancelled', 'done', 'partially_paid')
-ORDER BY a.created_at DESC
-LIMIT 1;
+      SELECT 
+        a.*, 
+        a.package_cost,
+        a.paymentType,
+        p.package_name,
+        p.total_sessions,
+        t.gender,
+        t.fname AS tutor_fname, 
+        t.lname AS tutor_lname
+      FROM applications a
+      JOIN users t ON a.tutor_id = t.id
+      JOIN packages p ON a.package_id = p.id
+      WHERE a.student_id = ? 
+        AND a.application_status IN ('pending', 'expired', 'submitted', 'approved', 'cancelled', 'done', 'partially_paid')
+      ORDER BY a.created_at DESC
+      LIMIT 1;
     `, [studentId]);
 
     if (apps.length === 0) {
@@ -32,22 +32,30 @@ LIMIT 1;
 
     const application = apps[0];
 
-    // 2. Fetch bookings for this application separately
+    // 2. Get all payments for that application
+    const [payments] = await db.query(
+      `SELECT * FROM payments WHERE application_id = ?`,
+      [application.id]
+    );
+    application.payments = payments; // ✅ Attach payments
+
+    // 3. Fetch bookings for this application
     const [bookings] = await db.query(`
       SELECT session_date, status
       FROM bookings
       WHERE application_id = ?
-      AND status IN ('pending', 'scheduled', 'accepted');
+        AND status IN ('pending', 'scheduled', 'accepted');
     `, [application.id]);
+    application.bookings = bookings; // ✅ Attach bookings
 
-    // 3. Calculate remaining sessions (total_sessions - booked sessions count)
+    // 4. Calculate remaining sessions
     const bookedSessionsCount = bookings.filter(b => b.status !== 'cancelled').length;
     application.remaining_sessions = application.total_sessions - bookedSessionsCount;
 
-    // 4. Check if pending application should be expired
-    if (application.application_status === 'Pending' && 
+    // 5. Expire pending app if deadline passed and no proof
+    if (application.application_status.toLowerCase() === 'pending' && 
         new Date(application.deadline) < new Date() && 
-        !application.payment_proof) {
+        !payments.length) {
       await db.query(`
         UPDATE applications 
         SET application_status = 'Expired'
@@ -55,9 +63,6 @@ LIMIT 1;
       `, [application.id]);
       application.application_status = 'Expired';
     }
-
-    // 5. Attach bookings array to the response
-    application.bookings = bookings;
 
     res.json(application);
   } catch (err) {
@@ -76,9 +81,13 @@ exports.submitPaymentProof = async (req, res) => {
   }
 
   try {
-    // ✅ Get the payment type from the application
+    // ✅ Get the payment type, student info, and pricing details
     const [[app]] = await db.query(
-      `SELECT paymentType, student_id, CONCAT(u.fname, ' ', u.lname) AS student_name
+      `SELECT 
+         a.paymentType, 
+         a.student_id, 
+         a.package_cost,
+         CONCAT(u.fname, ' ', u.lname) AS student_name
        FROM applications a
        JOIN users u ON a.student_id = u.id
        WHERE a.id = ?`,
@@ -89,17 +98,20 @@ exports.submitPaymentProof = async (req, res) => {
       return res.status(404).json({ message: 'Application not found.' });
     }
 
-    // ✅ Check if the application payment type is partial or full
     const isPartial = app.paymentType === 'partial';
 
-    // ✅ Save the payment proof in the payments table
+    // ✅ Calculate total fee
+    const totalFee = Number(app.package_cost) || 0;
+    const amountPaid = isPartial ? totalFee / 2 : totalFee;
+
+    // ✅ Save the payment proof in the payments table with amount_paid
     await db.query(
-      `INSERT INTO payments (application_id, payment_proof, is_partial)
-       VALUES (?, ?, ?)`,
-      [applicationId, paymentProof, isPartial]
+      `INSERT INTO payments (application_id, payment_proof, is_partial, amount_paid, payment_date)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [applicationId, paymentProof, isPartial, amountPaid]
     );
 
-    // ✅ Update application status to 'submitted' and mark submission time
+    // ✅ Update application status and submission time
     await db.query(
       `UPDATE applications 
        SET submitted_at = NOW(), application_status = 'submitted'
@@ -107,10 +119,13 @@ exports.submitPaymentProof = async (req, res) => {
       [applicationId]
     );
 
-    // ✅ Notify all admins
+    // ✅ Notify admins
     const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'admin'`);
     for (const admin of admins) {
-      await createNotification(admin.id, `New ${isPartial ? 'partial' : 'full'} payment proof submitted by ${app.student_name}`);
+      await createNotification(
+        admin.id,
+        `New ${isPartial ? 'partial' : 'full'} payment proof submitted by ${app.student_name}`
+      );
     }
 
     res.json({ message: 'Payment proof submitted and awaiting admin approval.' });
@@ -119,6 +134,7 @@ exports.submitPaymentProof = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
+
 
 // Cancel Application
 exports.cancelApplication = async (req, res) => {

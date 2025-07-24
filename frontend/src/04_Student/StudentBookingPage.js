@@ -355,17 +355,11 @@ const handleWeekdaySelect = (weekdayIndex) => {
     fetchApplication();
   }, [fetchApplication]);
 
-// Reset expired or cancelled state after 5 seconds
-  // useEffect(() => {
-  //   if (hasExpired || wasCancelled) {
-  //     const timer = setTimeout(() => {
-  //       setHasExpired(false);
-  //       setWasCancelled(false);
-  //     }, 5000);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [hasExpired, wasCancelled]);
-
+  useEffect(() => {
+  if (['pending', 'submitted', 'approved'].includes(applicationStatus?.toLowerCase())) {
+    setTab('application');
+  }
+}, [applicationStatus]);
 
   const fetchTutors = async () => {
     try {
@@ -592,88 +586,7 @@ const renderApplicationDetails = () => {
       </div>
     </form>
   </div>
-);
-
-  // const renderApprovedSection = () => (
-  //   <div className={baseCardClass}>
-  //     {/* {!showCalendar ? (
-  //       <button
-  //         onClick={() => setShowCalendar(true)}
-  //         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-  //       >
-  //         Book Session Dates
-  //       </button>
-  //     ) : (
-  //       <div className="mt-4">
-  //         <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
-  //           <h3 className="text-lg font-semibold">Select Dates for Sessions</h3>
-  //           <div className="flex gap-4 text-sm items-center">
-  //             <span className="font-medium">Legend:</span>
-  //             <Legend color="bg-blue-500" label="Selected" />
-  //             <Legend color="bg-yellow-100 border border-yellow-400" label="Pending" />
-  //             <Legend color="bg-green-100 border border-green-400" label="Scheduled" />
-  //           </div>
-  //         </div>
-
-  //         <div className="flex justify-between items-center mb-4">
-  //           <button onClick={() => handleMonthChange(-1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">&lt; Prev</button>
-  //           <h4 className="text-xl font-bold">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h4>
-  //           <button onClick={() => handleMonthChange(1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next &gt;</button>
-  //         </div>
-
-  //         <div className="grid grid-cols-7 gap-1 mb-4">
-  //           {weekdays.map((day, index) => (
-  //             <button
-  //               key={day}
-  //               onClick={() => handleWeekdaySelect(index)}
-  //               className={`text-sm px-2 py-1 rounded font-semibold ${
-  //                 selectedWeekday === index ? 'bg-blue-200' : 'hover:bg-gray-100'
-  //               }`}
-  //             >
-  //               {day.substring(0, 3)}
-  //             </button>
-  //           ))}
-  //           {renderCalendar()}
-  //         </div>
-
-  //         {selectedDates.length > 0 && (
-  //           <div className="mb-4">
-  //             <p className="font-semibold">Selected Dates ({selectedDates.length}):</p>
-  //             <div className="flex flex-wrap gap-2 mt-2">
-  //               {selectedDates.sort().map(date => (
-  //                 <span key={date} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-  //                   {new Date(date).toLocaleDateString()}
-  //                 </span>
-  //               ))}
-  //             </div>
-  //           </div>
-  //         )}
-
-  //         <div className="flex gap-2 mt-4">
-  //           <button
-  //             onClick={() => {
-  //               setShowCalendar(false);
-  //               setSelectedDates([]);
-  //               setSelectedWeekday(null);
-  //             }}
-  //             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-  //           >
-  //             Cancel
-  //           </button>
-  //           <button
-  //             onClick={handleSessionBooking}
-  //             disabled={selectedDates.length === 0}
-  //             className={`px-4 py-2 rounded text-white ${
-  //               selectedDates.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-  //             }`}
-  //           >
-  //             Confirm {selectedDates.length} Session{selectedDates.length !== 1 ? 's' : ''}
-  //           </button>
-  //         </div>
-  //       </div>
-  //     )} */}
-  //   </div>
-  // );
+  );
 
   const renderPendingSection = () => (
     <div className={baseCardClass}>
@@ -746,14 +659,16 @@ const renderApplicationDetails = () => {
     </div>
   );
 
+
+
   return (
     <>
       {renderCommonDetails()}
-      {application.application_status === 'approved'}
+      {application.paymentType === 'full' && application.application_status === 'approved'}
+      {renderPaymentDetails(application.payments, application.paymentType)}
       {application.application_status === 'pending' && renderPendingSection()}
       {['submitted', 'expired', 'cancelled', 'done'].includes(application.application_status) && renderSubmittedSection()}
       {application.paymentType === 'partial' && application.application_status === 'approved' && renderPartialPaymentSection()}
-      {/* {application.application_status === 'partially_paid' && renderPartialPaymentSection()} */}
     </>
   );
 };
@@ -763,6 +678,60 @@ const shouldHideApplyButton = (status) => {
   return hiddenStatuses.includes(status?.toLowerCase());
 };
 
+const renderPaymentDetails = (payments = [], paymentType) => {
+  if (payments.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 italic"></p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {payments.map((payment, index) => (
+        <div
+          key={payment.id}
+          className="flex flex-wrap items-center justify-between border p-4 rounded bg-gray-50 shadow-sm gap-4"
+        >
+          <div className="flex flex-col text-sm">
+            <span className="font-medium">
+              {paymentType === 'full'
+                ? 'Full Payment'
+                : index === 0
+                ? 'Initial Payment'
+                : 'Final Payment'}
+            </span>
+            <span className="text-gray-700">
+              Date Paid:{' '}
+              {new Date(payment.payment_date).toLocaleString()}
+            </span>
+            <span className="text-gray-700">
+              Amount: ₱{Number(payment.amount_paid).toFixed(2)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => viewPaymentProof(payment.payment_proof)}
+              className="text-blue-600 underline text-sm hover:text-blue-800"
+            >
+              View Proof
+            </button>
+
+            {payment.is_confirmed ? (
+              <span className="text-green-600 font-medium text-sm">Confirmed</span>
+            ) : (
+              <span className="text-red-600 font-medium text-sm">Pending</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+  const viewPaymentProof = (filename) => {
+    window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
+  };
 
 // JSX display mao ni ma display sa UI
   return (
