@@ -53,36 +53,40 @@ const AdminApplicationManagementPage = () => {
 
 const handleConfirmPayment = async (paymentId) => {
   try {
-    const res = await apiService.post(`/admin/confirm-payment/${paymentId}`);
+    const res = await apiService.post(`/applications/payments/${paymentId}/action`, { 
+      action: 'confirm'
+    });
     if (res.status === 200) {
-      setAlert({ type: 'success', message: 'Payment confirmed successfully.' });
-      
+      setAlert({ type: 'success', message: res.data.message || 'Payment confirmed successfully.' });
       fetchApplications(); // Refresh data
     }
   } catch (err) {
     console.error(err);
-    setAlert({ message: 'Payment Confirmation Failed.', severity: 'error', show: true });
+    setAlert({ type: 'error', message: 'Payment confirmation failed.', show: true });
   }
 };
 
 const handleRejectPayment = async (paymentId) => {
   try {
-    const res = await apiService.post(`/admin/reject-payment/${paymentId}`);
+    const res = await apiService.post(`/applications/payments/${paymentId}/action`, {
+      action: 'reject'
+    });
     if (res.status === 200) {
-      setAlert({ type: 'warning', message: 'Payment rejected successfully.' });
+      setAlert({ type: 'warning', message: res.data.message || 'Payment rejected successfully.' });
       fetchApplications(); // Refresh data
     }
   } catch (err) {
     console.error(err);
-    setAlert({ message: 'Payment Rejection Failed.', severity: 'error', show: true });
+    setAlert({ type: 'error', message: 'Payment rejection failed.', show: true });
   }
 };
 
-  const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
-    const totalPrice =
-      parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
-    return parseFloat(totalPrice.toFixed(2));
-  };
+
+  // const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
+  //   const totalPrice =
+  //     parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
+  //   return parseFloat(totalPrice.toFixed(2));
+  // };
 
   const formatCurrency = (amount_paid) => `₱${Number(amount_paid).toFixed(2)}`;
 

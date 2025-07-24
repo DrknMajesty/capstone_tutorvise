@@ -722,6 +722,12 @@ const renderPaymentDetails = (payments = [], paymentType) => {
             >
               View Proof
             </button>
+{/* <button
+  onClick={() => handleOpenCancelModal(payment.id)}
+  className="text-red-600 underline ml-4"
+>
+  Cancel Payment Proof
+</button> */}
 
             {payment.is_confirmed ? (
               <span className="text-green-600 font-medium text-sm">Confirmed</span>
@@ -737,6 +743,37 @@ const renderPaymentDetails = (payments = [], paymentType) => {
 
 const viewPaymentProof = (filename) => {
   window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
+};
+
+const [showCancelModal, setShowCancelModal] = useState(false);
+const [selectedPaymentId, setSelectedPaymentId] = useState(null);
+
+const handleOpenCancelModal = (id) => {
+  setSelectedPaymentId(id);
+  setShowCancelModal(true);
+};
+
+const handleConfirmCancel = async () => {
+  try {
+    await apiService.delete(`/applications/cancel-payment/${selectedPaymentId}`);
+    setAlert("Payment proof cancelled.");
+    setAlert({
+        message: 'Payment Proof Cancelled',
+        severity: 'success',
+        show: true,
+      });
+    fetchApplication(); // Reload
+  } catch (error) {
+    console.error(error);
+    setAlert({
+      message: "Failed to cancel payment proof.",
+      severity: "error",
+      show: true,
+    });
+  } finally {
+    setShowCancelModal(false);
+    setSelectedPaymentId(null);
+  }
 };
 
 // JSX display mao ni ma display sa UI
@@ -1084,6 +1121,30 @@ const viewPaymentProof = (filename) => {
           </div>
         </div>
       )}
+
+      {showCancelModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded shadow-md max-w-md w-full">
+      <h2 className="text-lg font-semibold mb-4">Cancel Payment Proof?</h2>
+      <p className="mb-4">This action will remove the uploaded payment proof. Continue?</p>
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={() => setShowCancelModal(false)}
+          className="px-4 py-2 border rounded text-gray-700"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirmCancel}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Yes, Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </>
   );
 };

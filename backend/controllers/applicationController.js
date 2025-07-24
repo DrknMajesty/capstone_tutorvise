@@ -519,3 +519,110 @@ exports.getMyApplications = async (req, res) => {
   }
 };
 
+// Student Payment Proof Cancellation
+exports.cancelPaymentProof = async (req, res) => {
+  const paymentId = req.params.paymentId;
+  const studentId = req.user.id;
+
+  try {
+    // First check if the payment belongs to the student and is not confirmed
+    const [paymentRows] = await db.query(
+      `SELECT p.id, p.payment_proof 
+       FROM payments p
+       JOIN applications a ON p.application_id = a.id
+       WHERE p.id = ? AND a.student_id = ? AND p.is_confirmed = 0`,
+      [paymentId, studentId]
+    );
+
+    if (paymentRows.length === 0) {
+      return res.status(403).json({ message: 'Cannot cancel this payment. It may already be confirmed or does not belong to you.' });
+    }
+
+    const payment = paymentRows[0];
+
+    // Optionally delete the proof image from storage
+    const fs = require('fs');
+    const filePath = `./uploads/payment_proofs/${payment.payment_proof}`;
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Now delete the payment record entirely
+    await db.query(
+      `DELETE FROM payments WHERE id = ?`,
+      [paymentId]
+    );
+
+    res.json({ message: 'Payment record deleted successfully.' });
+  } catch (error) {
+    console.error('Cancel payment error:', error);
+    res.status(500).json({ message: 'Server error while deleting payment.' });
+  }
+};
+
+exports.confirmOrRejectPayment = async (req, res) => {
+  const { paymentId } = req.params;
+  const { action } = req.body; // 'confirm' or 'reject'
+
+  if (!['confirm', 'reject'].includes(action)) {
+    return res.status(400).json({ message: 'Invalid action. Must be confirm or reject.' });
+  }
+
+  try {
+    // Fetch the payment and its application
+    const [rows] = await db.query(
+      `SELECT p.id, p.application_id, p.is_confirmed, a.application_status 
+       FROM payments p
+       JOIN applications a ON p.application_id = a.id
+       WHERE p.id = ?`,
+      [paymentId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Payment not found.' });
+    }
+
+    const payment = rows[0];
+
+    if (action === 'confirm') {
+      // Mark payment as confirmed
+      await db.query(
+        `UPDATE payments SET is_confirmed = 1 WHERE id = ?`,
+        [paymentId]
+      );
+
+      // If application is still submitted, update it to approved
+      if (payment.application_status === 'submitted') {
+        await db.query(
+          `UPDATE applications SET application_status = 'approved' WHERE id = ?`,
+          [payment.application_id]
+        );
+      }
+
+      return res.json({ message: 'Payment confirmed successfully.' });
+
+    } else if (action === 'reject') {
+      // Remove the payment record entirely
+      const [proofRow] = await db.query(
+        `SELECT payment_proof FROM payments WHERE id = ?`,
+        [paymentId]
+      );
+
+      if (proofRow.length > 0 && proofRow[0].payment_proof) {
+        const fs = require('fs');
+        const filePath = `./uploads/payment_proofs/${proofRow[0].payment_proof}`;
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+
+      await db.query(`DELETE FROM payments WHERE id = ?`, [paymentId]);
+
+      return res.json({ message: 'Payment proof rejected and deleted.' });
+    }
+
+  } catch (err) {
+    console.error('Admin payment confirmation error:', err);
+    res.status(500).json({ message: 'Server error during payment action.' });
+  }
+};

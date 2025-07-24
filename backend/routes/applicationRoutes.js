@@ -43,5 +43,11 @@ router.post('/expire/:id', applicationController.expireSingleApplication);
 //Student Fetch Application
 router.get('/:studentId/my-applications', authenticateToken, applicationController.getMyApplications);
 
+// Student Payment Proof Cancellation
+router.delete('/cancel-payment/:paymentId', authenticateToken, applicationController.cancelPaymentProof);
+
+//Admin - Confirm or Reject 
+router.post('/payments/:paymentId/action', authenticateToken, applicationController.confirmOrRejectPayment);
+
 module.exports = router;
 
