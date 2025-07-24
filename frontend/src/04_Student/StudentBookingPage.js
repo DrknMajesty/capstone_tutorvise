@@ -38,12 +38,12 @@ const StudentBookingPage = () => {
 
   const [applicationStatus, setApplicationStatus] = useState('');
 
+  const formatCurrency = (amount) => `₱${amount.toFixed(2)}`;
+
   const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
     const totalPrice = parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
     return parseFloat(totalPrice.toFixed(2));
   };
-
-  const formatCurrency = (amount) => `₱${amount.toFixed(2)}`;
 
   useEffect(() => {
     if (alert.show) {
@@ -499,7 +499,7 @@ const CountdownTimer = ({ deadline, onExpire }) => {
   return `${year}-${month}-${day}`;
 };
 
-  const shouldShowApplication = application && 
+const shouldShowApplication = application && 
                               (application.application_status === 'pending' || 
                                application.application_status === 'submitted' || 
                                application.application_status === 'approved' || 
@@ -561,7 +561,7 @@ const renderApplicationDetails = () => {
         Your initial partial payment was approved.
         Please upload the final payment proof to complete your application.
       </p>
-      <p><strong>Remaining Amount:</strong> ₱{(application.package_cost - (application.amount_paid || 0)).toFixed(2)}</p>
+      <p><strong>Remaining Amount:</strong> ₱{(application.remaining_amount)}</p>
     </div>
 
     <form onSubmit={handlePaymentSubmit} encType="multipart/form-data" className="bg-white p-4 rounded shadow space-y-4 mt-4">
@@ -665,10 +665,16 @@ const renderApplicationDetails = () => {
     <>
       {renderCommonDetails()}
       {application.paymentType === 'full' && application.application_status === 'approved'}
-      {renderPaymentDetails(application.payments, application.paymentType)}
+      {renderPaymentDetails(application.payments, application.paymentType)} 
       {application.application_status === 'pending' && renderPendingSection()}
-      {['submitted', 'expired', 'cancelled', 'done'].includes(application.application_status) && renderSubmittedSection()}
-      {application.paymentType === 'partial' && application.application_status === 'approved' && renderPartialPaymentSection()}
+      {['submitted', 'expired', 'cancelled', 'done'].includes(application.application_status) &&
+        application.payments?.every(p => !p.is_confirmed) &&
+        renderSubmittedSection()}
+      {application.paymentType === 'partial' &&
+      application.application_status === 'approved' &&
+      application.payments &&
+      application.payments.length < 2 &&
+      renderPartialPaymentSection()}
     </>
   );
 };
@@ -729,9 +735,9 @@ const renderPaymentDetails = (payments = [], paymentType) => {
   );
 };
 
-  const viewPaymentProof = (filename) => {
-    window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
-  };
+const viewPaymentProof = (filename) => {
+  window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
+};
 
 // JSX display mao ni ma display sa UI
   return (

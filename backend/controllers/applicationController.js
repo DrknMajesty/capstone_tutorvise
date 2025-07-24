@@ -39,6 +39,10 @@ exports.getMyApplication = async (req, res) => {
     );
     application.payments = payments; // ✅ Attach payments
 
+    // Calculate remaining balance
+    const remaining_amount = application.package_cost - (payments.reduce((sum, p) => sum + p.amount_paid, 0) || 0);
+    application.remaining_amount = remaining_amount > 0 ? remaining_amount : 0; 
+
     // 3. Fetch bookings for this application
     const [bookings] = await db.query(`
       SELECT session_date, status
@@ -112,12 +116,16 @@ exports.submitPaymentProof = async (req, res) => {
     );
 
     // ✅ Update application status and submission time
-    await db.query(
-      `UPDATE applications 
-       SET submitted_at = NOW(), application_status = 'submitted'
-       WHERE id = ?`,
-      [applicationId]
-    );
+await db.query(
+  `UPDATE applications 
+   SET submitted_at = NOW(), application_status = CASE 
+     WHEN application_status != 'approved' THEN 'submitted' 
+     ELSE application_status 
+   END
+   WHERE id = ?`,
+  [applicationId]
+);
+
 
     // ✅ Notify admins
     const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'admin'`);
@@ -134,7 +142,6 @@ exports.submitPaymentProof = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
-
 
 // Cancel Application
 exports.cancelApplication = async (req, res) => {
