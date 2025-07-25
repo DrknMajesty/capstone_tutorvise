@@ -57,6 +57,10 @@ const StudentPayment = () => {
     selectedApplication
   });
 
+  const viewPaymentProof = (filename) => {
+    window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
+  };
+
   return (
     <div>
       <ResponsiveNavbar username={username} />
@@ -105,8 +109,8 @@ const StudentPayment = () => {
                     className="w-full md:w-1/2 p-2 border border-gray-300 rounded"
                   >
                     {applications.map((app) => (
-                      <option key={app.id} value={app.id}>
-                        ID #{app.id} - {new Date(app.submitted_at || app.created_at).toLocaleDateString()}
+                      <option key={app.application_id} value={app.application_id}>
+                        ID #{app.application_id} - {new Date(app.submitted_at || app.created_at).toLocaleDateString()}
                       </option>
                     ))}
                   </select>
@@ -118,7 +122,7 @@ const StudentPayment = () => {
                     <h2 className="text-xl font-bold mb-4">Application Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <p className="mb-2"><strong>Application ID:</strong> #{selectedApplication.id}</p>
+                        <p className="mb-2"><strong>Application ID:</strong> #{selectedApplication.application_id}</p>
                         <p className="mb-2"><strong>Package:</strong> {selectedApplication.package_name}</p>
                         <p className="mb-2"><strong>Total Sessions:</strong> {selectedApplication.total_sessions}</p>
                         <p className="mb-2"><strong>Price per Session:</strong> {formatCurrency(selectedApplication.price_sessions)}</p>
@@ -138,6 +142,54 @@ const StudentPayment = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Payment Details */}
+                {selectedApplication.payments && selectedApplication.payments.map((payment, index) => (
+                  <div
+                    key={payment.payment_id}
+                    className="flex flex-wrap items-center justify-between border p-4 rounded bg-gray-50 shadow-sm gap-4"
+                  >
+                    <div className="flex flex-col text-sm">
+                      <span className="font-medium">
+                        {selectedApplication.payments.length === 1
+                          ? 'Full Payment'
+                          : index === 0
+                          ? 'Initial Payment'
+                          : 'Final Payment'}
+                      </span>
+                      <span className="text-gray-700">
+                        Date Paid:{' '}
+                        {new Date(payment.payment_date).toLocaleString([], {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true,
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                      <span className="text-gray-700">
+                        Amount: ₱{Number(payment.amount_paid).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => viewPaymentProof(payment.payment_proof)}
+                        className="text-blue-600 underline text-sm hover:text-blue-800"
+                      >
+                        View Proof
+                      </button>
+
+                      {/* {payment.is_confirmed ? (
+                        <span className="text-green-600 font-medium text-sm">Confirmed</span>
+                      ) : (
+                        <span className="text-red-600 font-medium text-sm">Pending</span>
+                      )} */}
+                    </div>
+                  </div>
+                ))}
+                    
               </>
             )}
 
@@ -158,40 +210,61 @@ const StudentPayment = () => {
                     {applications
                       .flatMap((app) => {
                         const totalAmount = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
-                        const total = totalAmount > 0 ? formatCurrency(totalAmount) : '';
+                        const totalFormatted = formatCurrency(totalAmount);
 
-                        const entries = [
-                          {
-                            id: `debit-${app.id}`,
-                            date: app.submitted_at || app.created_at,
-                            reference: `APP#${app.id}`,
-                            description: `Fee for ${app.package_name}`,
-                            debit: total,
-                            credit: ''
-                          }
-                        ];
+                        const entries = [];
 
-                        if (parseFloat(app.paid_amount) > 0) {
-                          entries.push({
-                            id: `credit-${app.id}`,
-                            date: app.payment_date,
-                            reference: app.reference || `PAY#${app.id}`,
-                            description: `Payment for ${app.package_name}`,
-                            debit: '',
-                            credit: formatCurrency(app.paid_amount)
+                        // DEBIT: Package Fee
+                        entries.push({
+                          id: `debit-${app.application_id}`,
+                          date: app.submitted_at || app.created_at,
+                          reference: `APP#${app.application_id}`,
+                          description: `Fee for ${app.package_name}`,
+                          debit: totalFormatted,
+                          credit: ''
+                        });
+
+                        // CREDIT: Payments
+                        let totalPaid = 0;
+                        if (app.payments && app.payments.length > 0) {
+                          app.payments.forEach((payment, index) => {
+                            totalPaid += parseFloat(payment.amount_paid);
+                            entries.push({
+                              id: `credit-${payment.payment_id}`,
+                              date: payment.payment_date,
+                              reference: `PAY#${payment.payment_id}`,
+                              description: `${payment.is_partial ? (index === 0 ? 'Initial' : 'Final') : 'Full'} payment for ${app.package_name}`,
+                              debit: '',
+                              credit: formatCurrency(payment.amount_paid)
+                            });
                           });
                         }
 
+                        // BALANCE Row
+                        const balance = totalAmount - totalPaid;
+                        entries.push({
+                          id: `balance-${app.application_id}`,
+                          date: '',
+                          reference: '',
+                          description: 'Remaining Balance',
+                          debit: '',
+                          credit: balance <= 0
+                            ? <span className="text-green-600 font-bold">₱0.00</span>
+                            : <span className="text-red-600 font-bold">{formatCurrency(balance)}</span>
+                        });
+
                         return entries;
                       })
-                      .sort((a, b) => new Date(a.date) - new Date(b.date))
+                      .sort((a, b) => new Date(a.date || '2100-01-01') - new Date(b.date || '2100-01-01'))
                       .map((entry) => (
                         <tr key={entry.id} className="border-t">
-                          <td className="px-4 py-2">{new Date(entry.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-2">{entry.date ? new Date(entry.date).toLocaleDateString() : ''}</td>
                           <td className="px-4 py-2">{entry.reference}</td>
-                          <td className="px-4 py-2">{entry.description}</td>
+                          <td className="px-4 py-2 font-medium">{entry.description}</td>
                           <td className="px-4 py-2 text-red-600">{entry.debit}</td>
-                          <td className="px-4 py-2 text-green-600">{entry.credit}</td>
+                          <td className="px-4 py-2 text-green-600">
+                            {typeof entry.credit === 'string' ? entry.credit : entry.credit}
+                          </td>
                         </tr>
                       ))}
                   </tbody>

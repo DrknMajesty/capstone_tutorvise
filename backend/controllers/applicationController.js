@@ -293,7 +293,6 @@ exports.getSubmittedApplications = async (req, res) => {
   }
 };
 
-
 // Approve application
 exports.approveApplication = async (req, res) => {
   const connection = await db.getConnection();
@@ -388,7 +387,6 @@ exports.approveApplication = async (req, res) => {
   }
 };
 
-
 // Reject application
 exports.rejectApplication = async (req, res) => {
   try {
@@ -482,42 +480,75 @@ exports.expireSingleApplication = async (req, res) => {
 
 exports.getMyApplications = async (req, res) => {
   const studentId = req.user.id;
+
   try {
-    const [apps] = await db.query(`
-  SELECT 
-    a.id,
-    a.tutor_id,
-    a.package_id,
-    a.application_status AS status,
-    a.submitted_at,
-    a.created_at,
-    p.package_name, 
-    p.price_package, 
-    p.total_sessions, 
-    p.price_sessions,
-    t.fname AS tutor_fname, 
-    t.lname AS tutor_lname,
-    pay.id AS payment_id,
-    pay.amount_paid AS paid_amount,
-    pay.payment_date
-
-  FROM applications a
-  JOIN packages p ON a.package_id = p.id
-  JOIN users t ON a.tutor_id = t.id
-  LEFT JOIN payments pay ON pay.application_id = a.id
-
-  WHERE a.student_id = ?
-    AND a.application_status IN ('Approved', 'Done')
-
-  ORDER BY a.submitted_at DESC;
+    // Step 1: Fetch applications
+    const [applications] = await db.query(`
+      SELECT 
+        a.id AS application_id,
+        a.tutor_id,
+        a.package_id,
+        a.application_status AS status,
+        a.submitted_at,
+        a.created_at,
+        p.package_name, 
+        p.price_package, 
+        p.total_sessions, 
+        p.price_sessions,
+        t.fname AS tutor_fname, 
+        t.lname AS tutor_lname
+      FROM applications a
+      JOIN packages p ON a.package_id = p.id
+      JOIN users t ON a.tutor_id = t.id
+      WHERE a.student_id = ?
+        AND a.application_status IN ('Approved', 'Done')
+      ORDER BY a.submitted_at DESC;
     `, [studentId]);
 
-    res.json(apps);
+    // Step 2: Fetch payments separately
+    const [payments] = await db.query(`
+      SELECT 
+        id AS payment_id,
+        application_id,
+        amount_paid,
+        payment_date,
+        payment_proof,
+        is_partial,
+        is_confirmed
+      FROM payments
+      WHERE application_id IN (
+        SELECT id FROM applications WHERE student_id = ?
+      )
+      AND is_confirmed = true  
+      ORDER BY payment_date ASC;
+    `, [studentId]);
+
+    // Step 3: Group payments per application
+    const appMap = {};
+    applications.forEach(app => {
+      appMap[app.application_id] = {
+        ...app,
+        payments: []
+      };
+    });
+
+    payments.forEach(pay => {
+      if (appMap[pay.application_id]) {
+        appMap[pay.application_id].payments.push(pay);
+      }
+    });
+
+    // Step 4: Convert object back to array
+    const result = Object.values(appMap);
+
+    res.json(result);
+
   } catch (err) {
-    console.error('Error fetching applications:', err);
+    console.error('Error fetching applications with payments:', err);
     res.status(500).json({ message: 'Server error.' });
   }
 };
+
 
 // Student Payment Proof Cancellation
 exports.cancelPaymentProof = async (req, res) => {
