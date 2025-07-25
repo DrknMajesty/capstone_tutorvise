@@ -27,6 +27,7 @@ import StaffUserPage from './02_Admin Staff/StaffUser';
 import StaffPackagePage from './02_Admin Staff/StaffPackage';
 import StaffSchedulesPage from './02_Admin Staff/StaffSchedules';
 import StaffSessionsPage from './02_Admin Staff/StaffSession';
+import StaffPaymentPage from './02_Admin Staff/StaffPayments'; 
 
 //Student Routes
 import StudentProfile from './04_Student/StudentProfile';
@@ -76,6 +77,7 @@ function App() {
           <Route path="/admin-staff/packages" element={<StaffPackagePage />} />
           <Route path="/admin-staff/schedules" element={<StaffSchedulesPage />} />
           <Route path="/admin-staff/sessions" element={<StaffSessionsPage/>} />
+          <Route path="/admin-staff/payments" element={<StaffPaymentPage />} />
         </Route>
 
         {/* Student Routes */}

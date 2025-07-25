@@ -22,6 +22,7 @@ const menuConfig = {
     { label: "Dashboard", path: "/admin-staff/dashboard" },
     { label: "Users", path: "/admin-staff/users" },
     { label: "Packages", path: "/admin-staff/packages" },
+    { label: "Payments", path: "/admin-staff/payments" },
     { label: "Schedules", path: "/admin-staff/schedules" },
     { label: "Sessions", path: "/admin-staff/sessions" },
     { label: "Profile", path: "/admin-staff/profile" },

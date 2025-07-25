@@ -11,7 +11,9 @@ const AdminApplicationManagementPage = () => {
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePaymentAppId, setVisiblePaymentAppId] = useState(null);
-  const itemsPerPage = 7;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const itemsPerPage = 4;
 
   useEffect(() => {
     fetchApplications();
@@ -31,6 +33,10 @@ const AdminApplicationManagementPage = () => {
     }
   }, [alert]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
+
   const fetchApplications = async () => {
     try {
       const res = await apiService.get('/applications/all-submitted');
@@ -47,9 +53,18 @@ const AdminApplicationManagementPage = () => {
     setVisiblePaymentAppId((prev) => (prev === appId ? null : appId));
   };
 
-  const viewPaymentProof = (filename) => {
-    window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
-  };
+    const [showModal, setShowModal] = useState(false);
+    const [proofUrl, setProofUrl] = useState('');
+
+    const openModal = (url) => {
+    setProofUrl(url);
+    setShowModal(true);
+    };
+
+    const closeModal = () => {
+    setShowModal(false);
+    setProofUrl('');
+    };
 
 const handleConfirmPayment = async (paymentId) => {
   try {
@@ -81,13 +96,6 @@ const handleRejectPayment = async (paymentId) => {
   }
 };
 
-
-  // const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
-  //   const totalPrice =
-  //     parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
-  //   return parseFloat(totalPrice.toFixed(2));
-  // };
-
   const formatCurrency = (amount_paid) => `₱${Number(amount_paid).toFixed(2)}`;
 
   const formatTimeRange = (startTime, endTime) => {
@@ -107,10 +115,17 @@ const handleRejectPayment = async (paymentId) => {
     return `${toLocalTime(startTime)} - ${toLocalTime(endTime)}`;
   };
 
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentApplications = applications.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(applications.length / itemsPerPage);
+    const filteredApplications = applications.filter((app) => {
+    const fullName = `${app.student_fname} ${app.student_lname}`.toLowerCase();
+    const matchesSearch = fullName.includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter ? app.application_status === statusFilter : true;
+    return matchesSearch && matchesStatus;
+    });
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentApplications = filteredApplications.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredApplications.length / itemsPerPage);
 
   return (
     <>
@@ -127,6 +142,26 @@ const handleRejectPayment = async (paymentId) => {
           <p>No applications to review.</p>
         ) : (
           <div className="space-y-4">
+            <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <input
+                    type="text"
+                    placeholder="Search by student name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="border px-3 py-2 rounded-md w-full sm:w-64"
+                />
+
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="border px-3 py-2 rounded-md w-full sm:w-48"
+                >
+                    <option value="">All Statuses</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="approved">Approved</option>
+                    <option value="done">Done</option>
+                </select>
+            </div>
             {currentApplications.map((app) => (
               <div key={app.id} className="border rounded-md shadow-sm">
                 <button
@@ -139,10 +174,7 @@ const handleRejectPayment = async (paymentId) => {
                       Package: {app.package_name} | Tutor: {app.tutor_fname} {app.tutor_lname} | Time: {formatTimeRange(app.snapshot_start_time, app.snapshot_end_time)}
                     </p>
                     <p className="text-sm text-gray-500">
-                      Submitted: {new Date(app.submitted_at).toLocaleString()}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Payment Type: {app.paymentType === 'full' ? 'Full Payment' : 'Partial Payment'}
+                      Submitted: {new Date(app.submitted_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit', hour12: true})} | Payment Due: {new Date(app.payment_due_date).toLocaleString()}
                     </p>
                   </div>
                   <span className={`text-sm font-medium px-2 py-1 rounded capitalize ${
@@ -156,19 +188,7 @@ const handleRejectPayment = async (paymentId) => {
                 </button>
 
                 {visiblePaymentAppId === app.id && (
-                  <div className="p-4 bg-white border-t space-y-4">
-                    {/* <div className="text-sm text-gray-700 space-y-1">
-                      <p><strong>Package Price:</strong> ₱{app.price_package}</p>
-                      <p><strong>Price/Session:</strong> ₱{app.price_sessions}</p>
-                      <p><strong>Total Sessions:</strong> {app.total_sessions}</p>
-                      <p><strong>Total Fee:</strong> {formatCurrency(
-                        calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions)
-                      )}</p>
-                      {app.payment_type === 'partial' && app.amount_paid && (
-                        <p><strong>Paid So Far:</strong> ₱{app.amount_paid}</p>
-                      )}
-                    </div> */}
-                      
+                  <div className="p-4 bg-white border-t space-y-4">                      
 {app.payments.length > 0 ? (
   app.payments.map((payment, index) => (
     <div key={payment.id} className="border p-4 mb-3 rounded bg-gray-50 shadow-sm">
@@ -189,10 +209,10 @@ const handleRejectPayment = async (paymentId) => {
 
           <div>
             <button
-              onClick={() => viewPaymentProof(payment.payment_proof)}
-              className="text-blue-600 underline hover:text-blue-800"
+                onClick={() => openModal(`http://localhost:5000/uploads/payment_proofs/${payment.payment_proof}`)}
+                className="text-blue-600 underline text-sm hover:text-blue-800"
             >
-              View Proof
+                View Payment Proof
             </button>
           </div>
 
@@ -260,6 +280,33 @@ const handleRejectPayment = async (paymentId) => {
           </div>
         )}
       </div>
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg overflow-hidden shadow-lg max-w-3xl w-full relative">
+            <button
+                onClick={closeModal}
+                className="absolute top-2 right-2 text-gray-600 hover:text-red-600 text-xl"
+            >
+                &times;
+            </button>
+            <div className="p-4 max-h-[80vh] overflow-auto">
+                {proofUrl.endsWith('.pdf') ? (
+                <iframe
+                    src={proofUrl}
+                    title="Payment Proof PDF"
+                    className="w-full h-[70vh]"
+                ></iframe>
+                ) : (
+                <img
+                    src={proofUrl}
+                    alt="Payment Proof"
+                    className="w-full max-h-[70vh] object-contain"
+                />
+                )}
+            </div>
+            </div>
+        </div>
+        )}
 
       {alert.show && (
         <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}>

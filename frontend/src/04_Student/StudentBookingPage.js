@@ -748,10 +748,10 @@ const viewPaymentProof = (filename) => {
 const [showCancelModal, setShowCancelModal] = useState(false);
 const [selectedPaymentId, setSelectedPaymentId] = useState(null);
 
-const handleOpenCancelModal = (id) => {
-  setSelectedPaymentId(id);
-  setShowCancelModal(true);
-};
+// const handleOpenCancelModal = (id) => {
+//   setSelectedPaymentId(id);
+//   setShowCancelModal(true);
+// };
 
 const handleConfirmCancel = async () => {
   try {
