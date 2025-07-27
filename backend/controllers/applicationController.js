@@ -2,7 +2,6 @@ const db = require('../db');
 const expireOldApplications = require('../utils/expireApplications');
 const { createNotification } = require('../utils/notification');
 
-// Get current user's latest application
 exports.getMyApplication = async (req, res) => {
   const studentId = req.user.id;
   try {
@@ -10,13 +9,14 @@ exports.getMyApplication = async (req, res) => {
     const [apps] = await db.query(`
       SELECT 
         a.*, 
-        a.package_cost,
         a.paymentType,
         p.package_name,
         p.total_sessions,
         t.gender,
         t.fname AS tutor_fname, 
-        t.lname AS tutor_lname
+        t.lname AS tutor_lname,
+        -- calculate package cost here
+        (CAST(p.price_package AS DECIMAL(10,2)) + (CAST(p.price_sessions AS DECIMAL(10,2)) * p.total_sessions)) AS package_cost
       FROM applications a
       JOIN users t ON a.tutor_id = t.id
       JOIN packages p ON a.package_id = p.id
@@ -37,11 +37,12 @@ exports.getMyApplication = async (req, res) => {
       `SELECT * FROM payments WHERE application_id = ?`,
       [application.id]
     );
-    application.payments = payments; // ✅ Attach payments
+    application.payments = payments;
 
     // Calculate remaining balance
-    const remaining_amount = application.package_cost - (payments.reduce((sum, p) => sum + p.amount_paid, 0) || 0);
-    application.remaining_amount = remaining_amount > 0 ? remaining_amount : 0; 
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount_paid, 0);
+    const remaining_amount = application.package_cost - totalPaid;
+    application.remaining_amount = remaining_amount > 0 ? remaining_amount : 0;
 
     // 3. Fetch bookings for this application
     const [bookings] = await db.query(`
@@ -50,16 +51,18 @@ exports.getMyApplication = async (req, res) => {
       WHERE application_id = ?
         AND status IN ('pending', 'scheduled', 'accepted');
     `, [application.id]);
-    application.bookings = bookings; // ✅ Attach bookings
+    application.bookings = bookings;
 
     // 4. Calculate remaining sessions
     const bookedSessionsCount = bookings.filter(b => b.status !== 'cancelled').length;
     application.remaining_sessions = application.total_sessions - bookedSessionsCount;
 
     // 5. Expire pending app if deadline passed and no proof
-    if (application.application_status.toLowerCase() === 'pending' && 
-        new Date(application.deadline) < new Date() && 
-        !payments.length) {
+    if (
+      application.application_status.toLowerCase() === 'pending' &&
+      new Date(application.deadline) < new Date() &&
+      !payments.length
+    ) {
       await db.query(`
         UPDATE applications 
         SET application_status = 'Expired'
@@ -75,6 +78,7 @@ exports.getMyApplication = async (req, res) => {
   }
 };
 
+
 // Submit payment proof
 exports.submitPaymentProof = async (req, res) => {
   const applicationId = req.params.applicationId;
@@ -87,14 +91,17 @@ exports.submitPaymentProof = async (req, res) => {
   try {
     // ✅ Get the payment type, student info, and pricing details
     const [[app]] = await db.query(
-      `SELECT 
-         a.paymentType, 
-         a.student_id, 
-         a.package_cost,
-         CONCAT(u.fname, ' ', u.lname) AS student_name
-       FROM applications a
-       JOIN users u ON a.student_id = u.id
-       WHERE a.id = ?`,
+      `
+SELECT 
+  a.paymentType, 
+  a.student_id, 
+  (CAST(p.price_package AS DECIMAL(10,2)) + (CAST(p.price_sessions AS DECIMAL(10,2)) * p.total_sessions)) AS package_cost,
+  CONCAT(u.fname, ' ', u.lname) AS student_name
+FROM applications a
+JOIN users u ON a.student_id = u.id
+JOIN packages p ON a.package_id = p.id
+WHERE a.id = ?
+       `,
       [applicationId]
     );
 
@@ -602,9 +609,8 @@ exports.confirmOrRejectPayment = async (req, res) => {
   try {
     // Fetch the payment and its application
     const [rows] = await db.query(
-      `SELECT p.id, p.application_id, p.is_confirmed, a.application_status 
+      `SELECT p.id, p.application_id, p.is_confirmed
        FROM payments p
-       JOIN applications a ON p.application_id = a.id
        WHERE p.id = ?`,
       [paymentId]
     );
@@ -616,16 +622,62 @@ exports.confirmOrRejectPayment = async (req, res) => {
     const payment = rows[0];
 
     if (action === 'confirm') {
-      // Mark payment as confirmed
+      // 1. Mark payment as confirmed
       await db.query(
         `UPDATE payments SET is_confirmed = 1 WHERE id = ?`,
         [paymentId]
       );
 
-      // If application is still submitted, update it to approved
-      if (payment.application_status === 'submitted') {
+      // 2. If application is still submitted, update it to approved and set expires_at
+      const [appStatusRows] = await db.query(
+        `SELECT application_status FROM applications WHERE id = ?`,
+        [payment.application_id]
+      );
+
+      if (appStatusRows.length > 0 && appStatusRows[0].application_status === 'submitted') {
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1); // Set expiration to 1 month from now
+
         await db.query(
-          `UPDATE applications SET application_status = 'approved' WHERE id = ?`,
+          `UPDATE applications SET application_status = 'approved', expires_at = ? WHERE id = ?`,
+          [expiresAt, payment.application_id]
+        );
+      }
+
+      // 3. Count confirmed partial and full payments
+      const [partialConfirmed] = await db.query(`
+        SELECT COUNT(*) AS count
+        FROM payments
+        WHERE application_id = ? AND is_partial = 1 AND is_confirmed = 1
+      `, [payment.application_id]);
+
+      const [fullConfirmed] = await db.query(`
+        SELECT COUNT(*) AS count
+        FROM payments
+        WHERE application_id = ? AND is_partial = 0 AND is_confirmed = 1
+      `, [payment.application_id]);
+
+      // 4. Check accepted bookings vs total sessions
+      const [bookingStats] = await db.query(`
+        SELECT 
+          COUNT(*) AS accepted_count,
+          MAX(p.total_sessions) AS total_sessions
+        FROM bookings b
+        JOIN applications a ON b.application_id = a.id
+        JOIN packages p ON a.package_id = p.id
+        WHERE b.application_id = ? AND b.status = 'accepted'
+      `, [payment.application_id]);
+
+      const acceptedCount = bookingStats[0].accepted_count;
+      const totalSessions = bookingStats[0].total_sessions;
+
+      // 5. Determine if conditions are met to mark application as done
+      const paymentConditionMet = (partialConfirmed[0].count >= 2) || (fullConfirmed[0].count >= 1);
+      const bookingConditionMet = acceptedCount === totalSessions;
+
+      if (paymentConditionMet && bookingConditionMet) {
+        await db.query(
+          `UPDATE applications SET application_status = 'done' WHERE id = ?`,
           [payment.application_id]
         );
       }
@@ -657,3 +709,4 @@ exports.confirmOrRejectPayment = async (req, res) => {
     res.status(500).json({ message: 'Server error during payment action.' });
   }
 };
+

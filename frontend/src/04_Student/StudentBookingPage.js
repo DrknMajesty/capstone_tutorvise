@@ -18,7 +18,6 @@ const StudentBookingPage = () => {
   const [hasExpired, setHasExpired] = useState(false);
   const [isDone, setisDone] = useState(false);
   const [wasCancelled, setWasCancelled] = useState(false);
-  const [setShowCalendar] = useState(false); //showCalendar
   const [selectedDates, setSelectedDates] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedWeekday, setSelectedWeekday] = useState(null);
@@ -217,7 +216,6 @@ const handleWeekdaySelect = (weekdayIndex) => {
         dates: selectedDates
       });
       setAlert({ message: 'Sessions booked successfully!', severity: 'success', show: true });
-      setShowCalendar(false);
       setSelectedDates([]);
       setSelectedWeekday(null);
       fetchApplication();
@@ -590,9 +588,28 @@ const renderApplicationDetails = () => {
 
   const renderPendingSection = () => (
     <div className={baseCardClass}>
-      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded mb-4">
-        <p className="font-semibold">Please submit your payment proof before the deadline.</p>
-      </div>
+<div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded mb-4">
+  {application.paymentType === 'partial' ? (
+    <>
+      <p className="font-semibold">
+        For partial payments, please submit your <span className="underline">initial payment proof</span> before the deadline. 
+        The amount should be at <span className="font-bold">50% of your selected package</span>. You can complete the remaining balance with another payment.
+      </p>
+      <p className="font-semibold">
+        The required amount is <span className="font-bold text-green-700">₱{(application.package_cost / 2).toLocaleString()}</span>.
+      </p>
+    </>
+  ) : (
+    <>
+      <p className="font-semibold">
+        Please submit your <span className="underline">full payment proof</span> before the deadline to finalize your application.
+      </p>
+      <p className="font-semibold">
+        The required amount is <span className="font-bold text-green-700">₱{application.package_cost.toLocaleString()}</span>.
+      </p>
+    </>
+  )}
+</div>
 
       <CountdownTimer
         deadline={application.deadline}
@@ -926,7 +943,7 @@ const handleConfirmCancel = async () => {
           <div className="flex gap-2 mt-4">
             <button
               onClick={() => {
-                setShowCalendar(false);
+
                 setSelectedDates([]);
                 setSelectedWeekday(null);
               }}
@@ -1084,21 +1101,6 @@ const handleConfirmCancel = async () => {
         </div>
       )}
 
-    {alert.show && (
-          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
-            fadeOut ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            <Alert
-              severity={alert.severity}
-              onClose={() => setAlert({ ...alert, show: false })}
-              variant="filled"
-            >
-              {alert.message}
-            </Alert>
-          </div>
-        )}
-
       {confirmCancelOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-lg max-w-sm w-full p-6">
@@ -1145,6 +1147,20 @@ const handleConfirmCancel = async () => {
   </div>
 )}
 
+    {alert.show && (
+          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
+            fadeOut ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            <Alert
+              severity={alert.severity}
+              onClose={() => setAlert({ ...alert, show: false })}
+              variant="filled"
+            >
+              {alert.message}
+            </Alert>
+          </div>
+        )}
     </>
   );
 };

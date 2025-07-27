@@ -12,8 +12,11 @@ const AdminReportPage = () => {
   const [dateInputs, setDateInputs] = useState({ start: '', end: '' });
   const [activeFilters, setActiveFilters] = useState({ start: '', end: '' });
   const [activeTab, setActiveTab] = useState('ratings');
-  const [financeData, setFinanceData] = useState({ income: 0, receivables: 0, applications: [] });
-  const [isLoading, setIsLoading] = useState({ ratings: false, finance: false, feedback: false });
+  const [financeData, setFinanceData] = useState({
+    totalCollection: 0,
+    payments: [],
+  });
+  const [isLoading, setIsLoading] = useState({ ratings: false, collection: false, feedback: false });
 
   useEffect(() => {
     if (activeTab === 'comments') {
@@ -21,7 +24,7 @@ const AdminReportPage = () => {
       setActiveFilters({ start: '', end: '' });
       setSelectedTutorId('');
       setTutorFeedback([]);
-    } else if (activeTab === 'finance') {
+    } else if (activeTab === 'collection') {
       setDateInputs({ start: '', end: '' });
       setActiveFilters({ start: '', end: '' });
     }
@@ -43,20 +46,27 @@ const AdminReportPage = () => {
     }
   }, [activeFilters]);
 
-  const fetchFinance = useCallback(async () => {
-    setIsLoading(prev => ({ ...prev, finance: true }));
-    try {
-      const params = new URLSearchParams();
-      if (activeFilters.start) params.append('start', activeFilters.start);
-      if (activeFilters.end) params.append('end', activeFilters.end);
-      const res = await apiService.get(`/reports/finance?${params.toString()}`);
-      setFinanceData(res.data);
-    } catch (err) {
-      console.error('Failed to fetch financial report:', err);
-    } finally {
-      setIsLoading(prev => ({ ...prev, finance: false }));
-    }
-  }, [activeFilters]);
+const fetchFinance = useCallback(async () => {
+  setIsLoading(prev => ({ ...prev, collection: true }));
+
+  try {
+    const params = new URLSearchParams();
+    if (activeFilters.start) params.append('start', activeFilters.start);
+    if (activeFilters.end) params.append('end', activeFilters.end);
+
+    const res = await apiService.get(`/reports/finance?${params.toString()}`);
+
+    // Expecting: { totalCollection, payments }
+    const { totalCollection, payments } = res.data;
+    setFinanceData({ totalCollection, payments });
+
+    console.log("Finance Data:", res.data);
+  } catch (err) {
+    console.error('Failed to fetch financial report:', err);
+  } finally {
+    setIsLoading(prev => ({ ...prev, collection: false }));
+  }
+}, [activeFilters]);
 
   const fetchTutorFeedback = useCallback(async (tutorId) => {
     if (!tutorId) {
@@ -77,7 +87,7 @@ const AdminReportPage = () => {
   useEffect(() => {
     if (activeTab === 'ratings') {
       fetchRatings();
-    } else if (activeTab === 'finance') {
+    } else if (activeTab === 'collection') {
       fetchFinance();
     }
   }, [activeTab, fetchRatings, fetchFinance, activeFilters]);
@@ -114,7 +124,7 @@ const handleDownloadPDF = () => {
       theme: 'striped',
       styles: { fontSize: 10 },
     });
-  } else if (activeTab === 'finance') {
+  } else if (activeTab === 'collection') {
     doc.setFontSize(12);
     doc.text(`Total Income: ₱${Number(financeData.income).toFixed(2)}`, 14, 30);
     doc.text(`Total Receivables: ₱${Number(financeData.receivables).toFixed(2)}`, 14, 38);
@@ -176,7 +186,7 @@ const handleDownloadPDF = () => {
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-2">
-            {['ratings', 'comments', 'finance'].map((tab) => (
+            {['ratings', 'comments', 'collection'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -196,7 +206,7 @@ const handleDownloadPDF = () => {
         </div>
 
         {/* Filters */}
-        {(activeTab === 'ratings' || activeTab === 'finance') && (
+        {(activeTab === 'ratings' || activeTab === 'collection') && (
           <div className="mb-4 flex flex-col md:flex-row md:items-center md:gap-4">
             <div>
               <label className="block mb-1 text-sm font-medium">Start Date:</label>
@@ -251,96 +261,99 @@ const handleDownloadPDF = () => {
 
         {/* Report Content */}
         <div id="report-content">
-          {activeTab === 'finance' && (
-            <div className="bg-gray-100 p-6 rounded shadow mb-8">
-              <h2 className="text-xl font-semibold mb-4">Income Report</h2>
-              {isLoading.finance ? (
-                <p>Loading financial data...</p>
-              ) : (
-                <>
-                  <p className="text-lg">
-                    Total Income: <strong>₱{Number(financeData.income).toFixed(2)}</strong>
-                  </p>
-                  <p className="text-lg">
-                    Total Receivables: <strong>₱{Number(financeData.receivables).toFixed(2)}</strong>
-                  </p>
-
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2">Application Details</h3>
-                    {financeData.applications?.length === 0 ? (
-                      <p className="text-gray-500 italic">
-                        {activeFilters.start || activeFilters.end
-                          ? 'No applications found for the selected date range.'
-                          : 'No application records available.'}
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full border border-gray-300 text-sm">
-                          <thead className="bg-gray-100">
-                            <tr>
-                              <th className="border px-4 py-2">ID</th>
-                              <th className="border px-4 py-2">Status</th>
-                              <th className="border px-4 py-2">Student</th>
-                              <th className="border px-4 py-2">Package</th>
-                              <th className="border px-4 py-2">Submitted</th>
-                              <th className="border px-4 py-2">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {financeData.applications.map((app, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                <td className="border px-4 py-2">{app.application_id}</td>
-                                <td className="border px-4 py-2 capitalize">{app.application_status}</td>
-                                <td className="border px-4 py-2">{app.student_name}</td>
-                                <td className="border px-4 py-2">{app.package_name}</td>
-                                <td className="border px-4 py-2">
-                                  {new Date(app.submitted_at).toLocaleDateString()}
-                                </td>
-                                <td className="border px-4 py-2">
-                                  ₱{Number(app.total_price).toFixed(2)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+{activeTab === 'collection' && (
+  <div className="bg-gray-100 p-6 rounded shadow mb-8">
+    <h2 className="text-xl font-semibold mb-4">Collection Report</h2>
+    {isLoading.collection ? (
+      <p>Loading payment collection data...</p>
+    ) : (
+      <>
+        <p className="text-lg">
+          Total Collection:{' '}
+          <strong>₱{Number(financeData.totalCollection || 0).toFixed(2)}</strong>
+        </p>
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-2">Payment Details</h3>
+          {financeData.payments?.length === 0 ? (
+            <p className="text-gray-500 italic">
+              {activeFilters.start || activeFilters.end
+                ? 'No payments found for the selected date range.'
+                : 'No payment records available.'}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-300 text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4 py-2">Payment ID</th>
+                    <th className="border px-4 py-2">Type</th>
+                    <th className="border px-4 py-2">Student</th>
+                    <th className="border px-4 py-2">Package</th>
+                    <th className="border px-4 py-2">Date Paid</th>
+                    <th className="border px-4 py-2">Amount Paid</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData.payments.map((payment, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="border px-4 py-2">{payment.payment_id}</td>
+                      <td className="border px-4 py-2">{payment.is_partial ? 'Partial' : 'Full'}</td>
+                      <td className="border px-4 py-2">{payment.student_name}</td>
+                      <td className="border px-4 py-2">{payment.package_name}</td>
+                      <td className="border px-4 py-2">
+                        {new Date(payment.payment_date).toLocaleDateString()}
+                      </td>
+                      <td className="border px-4 py-2">
+                        ₱{Number(payment.amount_paid).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+        </div>
+      </>
+    )}
+  </div>
+)}
 
-          {activeTab === 'ratings' && (
-            isLoading.ratings ? (
-              <p>Loading ratings data...</p>
-            ) : ratingsData.length === 0 ? (
-              <p className="text-gray-500">No ratings data available.</p>
-            ) : (
-              <div className="overflow-x-auto mb-8">
-                <table className="min-w-full table-auto border border-gray-300 text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="border px-4 py-2 text-left">Rank</th>
-                      <th className="border px-4 py-2 text-left">Tutor Name</th>
-                      <th className="border px-4 py-2 text-left">Average Rating</th>
-                      <th className="border px-4 py-2 text-left">Total Ratings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ratingsData.map((tutor, index) => (
-                      <tr key={tutor.tutor_id} className="hover:bg-gray-50">
-                        <td className="border px-4 py-2">{index + 1}</td>
-                        <td className="border px-4 py-2">{tutor.name}</td>
-                        <td className="border px-4 py-2">{Number(tutor.average_rating).toFixed(2)}</td>
-                        <td className="border px-4 py-2">{tutor.rating_count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          )}
+
+{activeTab === 'ratings' && (
+  isLoading.ratings ? (
+    <p>Loading ratings data...</p>
+  ) : (
+    <div className="overflow-x-auto mb-8">
+      {ratingsData.filter(t => t.rating_count > 0).length === 0 ? (
+        <p className="text-gray-500">No tutor ratings available.</p>
+      ) : (
+        <table className="min-w-full table-auto border border-gray-300 text-sm">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="border px-4 py-2 text-left">Rank</th>
+              <th className="border px-4 py-2 text-left">Tutor Name</th>
+              <th className="border px-4 py-2 text-left">Average Rating</th>
+              <th className="border px-4 py-2 text-left">Total Ratings</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ratingsData
+              .filter(tutor => tutor.rating_count > 0)
+              .map((tutor, index) => (
+                <tr key={tutor.tutor_id} className="hover:bg-gray-50">
+                  <td className="border px-4 py-2">{index + 1}</td>
+                  <td className="border px-4 py-2">{tutor.name}</td>
+                  <td className="border px-4 py-2">{Number(tutor.average_rating).toFixed(2)}</td>
+                  <td className="border px-4 py-2">{tutor.rating_count}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+)}
+
 
           {activeTab === 'comments' && (
             <div className="space-y-6">

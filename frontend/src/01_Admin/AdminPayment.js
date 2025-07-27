@@ -72,12 +72,12 @@ const handleConfirmPayment = async (paymentId) => {
       action: 'confirm'
     });
     if (res.status === 200) {
-      setAlert({ type: 'success', message: res.data.message || 'Payment confirmed successfully.' });
+      setAlert({ message: 'Payment confirmed successfully.', severity: 'success', show: true });
       fetchApplications(); // Refresh data
     }
   } catch (err) {
     console.error(err);
-    setAlert({ type: 'error', message: 'Payment confirmation failed.', show: true });
+    setAlert({ message: 'Payment Confirmatino Failed.', severity: 'error', show: true });
   }
 };
 

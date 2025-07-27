@@ -180,12 +180,6 @@ const StudentPayment = () => {
                       >
                         View Proof
                       </button>
-
-                      {/* {payment.is_confirmed ? (
-                        <span className="text-green-600 font-medium text-sm">Confirmed</span>
-                      ) : (
-                        <span className="text-red-600 font-medium text-sm">Pending</span>
-                      )} */}
                     </div>
                   </div>
                 ))}

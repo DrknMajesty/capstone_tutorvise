@@ -76,7 +76,7 @@ exports.submitApplication = async (req, res) => {
     const { price_package, price_sessions, total_sessions } = packageRows[0];
 
     // Calculate total cost from session price * session count
-    const package_cost = parseFloat(price_package) + (parseFloat(price_sessions) * parseInt(total_sessions));
+    // const package_cost = parseFloat(price_package) + (parseFloat(price_sessions) * parseInt(total_sessions));
 
     // 12-hour deadline
     const deadline = new Date(Date.now() + 12 * 60 * 60 * 1000);
@@ -84,8 +84,8 @@ exports.submitApplication = async (req, res) => {
     // Save application
     await db.query(
       `INSERT INTO applications 
-        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time, deadline, package_cost, paymentType)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (student_id, package_id, tutor_id, timeslot_id, snapshot_start_time, snapshot_end_time, deadline, paymentType)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         student_id,
         package_id,
@@ -94,7 +94,6 @@ exports.submitApplication = async (req, res) => {
         timeslot.start_time,
         timeslot.end_time,
         deadline,
-        package_cost,
         paymentType,
       ]
     );
@@ -358,21 +357,45 @@ exports.acceptBooking = async (req, res) => {
     const acceptedCount = acceptedCountResult[0].accepted_count;
     let applicationMarkedDone = false;
 
-    // 6. If all sessions accepted, mark timeslot and application as done
+    // 6. If all sessions accepted, conditionally mark application as 'done'
     if (acceptedCount === booking.total_sessions) {
-      await connection.query(`
-        UPDATE timeslots
-        SET status = 'available'
-        WHERE id = ?
-      `, [booking.timeslot_id]);
+      // Check payment status based on paymentType
+      const [payments] = await connection.query(`
+        SELECT COUNT(*) AS confirmed_count
+        FROM payments
+        WHERE application_id = ? AND is_confirmed = 1
+      `, [booking.application_id]);
 
-      await connection.query(`
-        UPDATE applications
-        SET application_status = 'done'
+      const confirmedCount = payments[0].confirmed_count;
+
+      const [appData] = await connection.query(`
+        SELECT paymentType
+        FROM applications
         WHERE id = ?
       `, [booking.application_id]);
 
-      applicationMarkedDone = true;
+      const paymentType = appData[0].paymentType;
+
+      const shouldMarkAsDone = (
+        (paymentType === 'partial' && confirmedCount >= 2) ||
+        (paymentType === 'full' && confirmedCount >= 1)
+      );
+
+      if (shouldMarkAsDone) {
+        await connection.query(`
+          UPDATE timeslots
+          SET status = 'available'
+          WHERE id = ?
+        `, [booking.timeslot_id]);
+
+        await connection.query(`
+          UPDATE applications
+          SET application_status = 'done'
+          WHERE id = ?
+        `, [booking.application_id]);
+
+        applicationMarkedDone = true;
+      }
     }
 
     // 7. Commit transaction

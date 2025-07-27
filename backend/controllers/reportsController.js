@@ -71,37 +71,43 @@ exports.getFinanceReport = async (req, res) => {
 
   try {
     let baseSql = `
-    SELECT
-      a.id AS application_id,
-      a.application_status,
-      CONCAT(s.fname, ' ', s.lname) AS student_name,
-      p.package_name,
-      a.submitted_at,
-      (CAST(p.price_package AS DECIMAL(10,2)) + (CAST(p.price_sessions AS DECIMAL(10,2)) * p.total_sessions)) AS total_price
-    FROM applications a
-    JOIN packages p ON a.package_id = p.id
-    JOIN users s ON a.student_id = s.id
-    WHERE a.application_status IN ('Approved', 'Submitted', 'Done')
+      SELECT 
+        p.id AS payment_id,
+        p.application_id,
+        p.amount_paid,
+        p.payment_date,
+        p.is_partial,
+        p.is_confirmed,
+
+        a.student_id,
+        a.paymentType,
+        a.application_status,
+        a.submitted_at,
+
+        CONCAT(u.fname, ' ', u.lname) AS student_name,
+        pkg.package_name,
+        (CAST(pkg.price_package AS DECIMAL(10,2)) + (CAST(pkg.price_sessions AS DECIMAL(10,2)) * pkg.total_sessions)) AS total_price
+      FROM payments p
+      JOIN applications a ON p.application_id = a.id
+      JOIN users u ON a.student_id = u.id
+      JOIN packages pkg ON a.package_id = pkg.id
+      WHERE p.is_confirmed = 1
     `;
 
     const params = [];
+
     if (start && end) {
-      baseSql += ` AND DATE(a.submitted_at) BETWEEN ? AND ?`;
+      baseSql += ` AND DATE(p.payment_date) BETWEEN ? AND ?`;
       params.push(start, end);
     }
 
-    const [apps] = await db.query(baseSql, params);
-    // console.log('Fetched applications:', apps);
+    baseSql += ` ORDER BY p.payment_date DESC`;
 
-  const income = apps
-    .filter(a => ['approved', 'done'].includes(a.application_status.toLowerCase()))
-    .reduce((sum, a) => sum + parseFloat(a.total_price || 0), 0);
+    const [payments] = await db.query(baseSql, params);
 
-  const receivables = apps
-    .filter(a => a.application_status.toLowerCase() === 'submitted')
-    .reduce((sum, a) => sum + parseFloat(a.total_price || 0), 0);
+    const totalCollection = payments.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
 
-    res.json({ income, receivables, applications: apps });
+    res.json({ totalCollection, payments });
   } catch (err) {
     console.error('Error generating financial report:', err);
     res.status(500).json({ message: 'Failed to generate financial report.' });
