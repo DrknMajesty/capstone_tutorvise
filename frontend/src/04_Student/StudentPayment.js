@@ -54,6 +54,12 @@ const StudentPayment = () => {
     window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
   };
 
+  const totalRemaining = applications.reduce((sum, app) => {
+    const total = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
+    const paid = (app.payments || []).reduce((s, p) => s + parseFloat(p.amount_paid || 0), 0);
+    return sum + (total - paid);
+  }, 0);
+  
   return (
     <div>
       <ResponsiveNavbar username={username} />
@@ -176,7 +182,7 @@ const StudentPayment = () => {
               </>
             )}
 
-            {view === 'ledger' && (
+{view === 'ledger' && (
               <div className="bg-white shadow rounded-lg p-6 border">
                 <h2 className="text-xl font-bold mb-4">Payment Ledger</h2>
                 <table className="w-full border text-sm">
@@ -194,7 +200,6 @@ const StudentPayment = () => {
                       .flatMap((app) => {
                         const totalAmount = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
                         const totalFormatted = formatCurrency(totalAmount);
-
                         const entries = [];
 
                         entries.push({
@@ -206,10 +211,8 @@ const StudentPayment = () => {
                           credit: ''
                         });
 
-                        let totalPaid = 0;
                         if (app.payments && app.payments.length > 0) {
                           app.payments.forEach((payment, index) => {
-                            totalPaid += parseFloat(payment.amount_paid);
                             entries.push({
                               id: `credit-${payment.payment_id}`,
                               date: payment.payment_date,
@@ -220,19 +223,6 @@ const StudentPayment = () => {
                             });
                           });
                         }
-
-                        const balance = totalAmount - totalPaid;
-                        entries.push({
-                          id: `balance-${app.application_id}`,
-                          date: '',
-                          reference: '',
-                          description: 'Remaining Balance',
-                          debit: '',
-                          credit: balance <= 0
-                            ? <span className="text-green-600 font-bold">₱0.00</span>
-                            : <span className="text-red-600 font-bold">{formatCurrency(balance)}</span>
-                        });
-
                         return entries;
                       })
                       .sort((a, b) => new Date(a.date || '2100-01-01') - new Date(b.date || '2100-01-01'))
@@ -242,12 +232,20 @@ const StudentPayment = () => {
                           <td className="px-4 py-2">{entry.reference}</td>
                           <td className="px-4 py-2 font-medium">{entry.description}</td>
                           <td className="px-4 py-2 text-red-600">{entry.debit}</td>
-                          <td className="px-4 py-2 text-green-600">
-                            {typeof entry.credit === 'string' ? entry.credit : entry.credit}
-                          </td>
+                          <td className="px-4 py-2 text-green-600">{entry.credit}</td>
                         </tr>
                       ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-gray-50 font-semibold">
+                      <td colSpan="4" className="px-4 py-2 text-right">Remaining Balance</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={totalRemaining <= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                          {formatCurrency(totalRemaining <= 0 ? 0 : totalRemaining)}
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
