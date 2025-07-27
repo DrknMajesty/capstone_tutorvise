@@ -137,7 +137,7 @@ const handleDownloadPDF = () => {
         app.application_status,
         app.student_name,
         app.package_name,
-        new Date(app.submitted_at).toLocaleDateString(),
+        new Date(app.created_at).toLocaleDateString(),
         `₱${Number(app.total_price).toFixed(2)}`
       ]),
       styles: { fontSize: 9 },

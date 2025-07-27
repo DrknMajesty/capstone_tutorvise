@@ -78,7 +78,6 @@ exports.getMyApplication = async (req, res) => {
   }
 };
 
-
 // Submit payment proof
 exports.submitPaymentProof = async (req, res) => {
   const applicationId = req.params.applicationId;
@@ -125,7 +124,7 @@ WHERE a.id = ?
     // ✅ Update application status and submission time
 await db.query(
   `UPDATE applications 
-   SET submitted_at = NOW(), application_status = CASE 
+   SET application_status = CASE 
      WHEN application_status != 'approved' THEN 'submitted' 
      ELSE application_status 
    END
@@ -254,7 +253,6 @@ exports.getSubmittedApplications = async (req, res) => {
           tutor_id: row.tutor_id,
           package_id: row.package_id,
           application_status: row.application_status,
-          submitted_at: row.submitted_at,
           created_at: row.created_at,
           updated_at: row.updated_at,
           paymentType: row.paymentType, // ✅ included here
@@ -496,7 +494,6 @@ exports.getMyApplications = async (req, res) => {
         a.tutor_id,
         a.package_id,
         a.application_status AS status,
-        a.submitted_at,
         a.created_at,
         p.package_name, 
         p.price_package, 
@@ -509,7 +506,7 @@ exports.getMyApplications = async (req, res) => {
       JOIN users t ON a.tutor_id = t.id
       WHERE a.student_id = ?
         AND a.application_status IN ('Approved', 'Done')
-      ORDER BY a.submitted_at DESC;
+      ORDER BY a.created_at DESC;
     `, [studentId]);
 
     // Step 2: Fetch payments separately
@@ -555,7 +552,6 @@ exports.getMyApplications = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
-
 
 // Student Payment Proof Cancellation
 exports.cancelPaymentProof = async (req, res) => {

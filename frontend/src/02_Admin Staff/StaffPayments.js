@@ -147,7 +147,7 @@ const StaffPaymentPage = () => {
                       Package: {app.package_name} | Tutor: {app.tutor_fname} {app.tutor_lname} | Time: {formatTimeRange(app.snapshot_start_time, app.snapshot_end_time)}
                     </p>
                     <p className="text-sm text-gray-500">
-                      Submitted: {new Date(app.submitted_at).toLocaleString()}
+                      Submitted: {new Date(app.created_at).toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-500">
                       Payment Type: {app.paymentType === 'full' ? 'Full Payment' : 'Partial Payment'}

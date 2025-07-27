@@ -82,7 +82,7 @@ exports.getFinanceReport = async (req, res) => {
         a.student_id,
         a.paymentType,
         a.application_status,
-        a.submitted_at,
+        a.created_at,
 
         CONCAT(u.fname, ' ', u.lname) AS student_name,
         pkg.package_name,

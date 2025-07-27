@@ -10,7 +10,7 @@ const StudentPayment = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedAppId, setSelectedAppId] = useState(null);
-  const [view, setView] = useState('applications'); // 'applications' or 'ledger'
+  const [view, setView] = useState('applications');
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -19,13 +19,12 @@ const StudentPayment = () => {
 
       try {
         const response = await apiService.get(`/applications/${user_id}/my-applications`);
-        console.log("Applications Data:", response);
         const sorted = response.data.sort(
-          (a, b) => new Date(b.submitted_at || b.created_at) - new Date(a.submitted_at || a.created_at)
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
         setApplications(sorted);
-        if (sorted.length > 0 && (!selectedAppId || !sorted.some(app => app.id === selectedAppId))) {
-          setSelectedAppId(sorted[0].id);
+        if (sorted.length > 0 && (!selectedAppId || !sorted.some(app => app.application_id === selectedAppId))) {
+          setSelectedAppId(sorted[0].application_id);
         }
       } catch (err) {
         console.error("Error fetching applications:", err);
@@ -38,7 +37,7 @@ const StudentPayment = () => {
     fetchApplications();
   }, [user_id, selectedAppId]);
 
-  const selectedApplication = applications.find((app) => app.id === (selectedAppId || applications[0]?.id));
+  const selectedApplication = applications.find(app => app.application_id === selectedAppId);
 
   const calculateTotalPrice = (price_package, total_sessions, price_sessions) => {
     const totalPrice = parseFloat(price_package || 0) + (parseInt(total_sessions || 0) * parseFloat(price_sessions || 0));
@@ -50,12 +49,6 @@ const StudentPayment = () => {
     if (isNaN(num)) return '';
     return `₱${num.toFixed(2)}`;
   };
-
-  console.log('Current State:', {
-    selectedAppId,
-    applications,
-    selectedApplication
-  });
 
   const viewPaymentProof = (filename) => {
     window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
@@ -100,7 +93,6 @@ const StudentPayment = () => {
           <>
             {view === 'applications' && (
               <>
-                {/* Dropdown Selector */}
                 <div className="mb-6">
                   <label className="block text-lg font-medium mb-2">Select an Application:</label>
                   <select
@@ -110,13 +102,12 @@ const StudentPayment = () => {
                   >
                     {applications.map((app) => (
                       <option key={app.application_id} value={app.application_id}>
-                        ID #{app.application_id} - {new Date(app.submitted_at || app.created_at).toLocaleDateString()}
+                        ID #{app.application_id} - {new Date(app.created_at).toLocaleDateString()}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Application Details */}
                 {selectedApplication && (
                   <div className="bg-white shadow rounded-lg p-6 border">
                     <h2 className="text-xl font-bold mb-4">Application Details</h2>
@@ -130,21 +121,20 @@ const StudentPayment = () => {
                       <div>
                         <p className="mb-2"><strong>Package Price:</strong> {formatCurrency(selectedApplication.price_package)}</p>
                         <p className="mb-2"><strong>Total Price:</strong> {formatCurrency(calculateTotalPrice(
-                          selectedApplication.price_package, 
-                          selectedApplication.total_sessions, 
-                          selectedApplication.price_sessions)
-                        )}</p>
+                          selectedApplication.price_package,
+                          selectedApplication.total_sessions,
+                          selectedApplication.price_sessions
+                        ))}</p>
                         <p className="mb-2">
-                          <strong>Submitted At:</strong>{' '}
-                          {new Date(selectedApplication.submitted_at || selectedApplication.created_at).toLocaleString()}
+                          <strong>Applied At:</strong>{' '}
+                          {new Date(selectedApplication.created_at).toLocaleString()}
                         </p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Payment Details */}
-                {selectedApplication.payments && selectedApplication.payments.map((payment, index) => (
+                {(selectedApplication?.payments || []).map((payment, index) => (
                   <div
                     key={payment.payment_id}
                     className="flex flex-wrap items-center justify-between border p-4 rounded bg-gray-50 shadow-sm gap-4"
@@ -183,7 +173,6 @@ const StudentPayment = () => {
                     </div>
                   </div>
                 ))}
-                    
               </>
             )}
 
@@ -208,17 +197,15 @@ const StudentPayment = () => {
 
                         const entries = [];
 
-                        // DEBIT: Package Fee
                         entries.push({
                           id: `debit-${app.application_id}`,
-                          date: app.submitted_at || app.created_at,
+                          date: app.created_at,
                           reference: `APP#${app.application_id}`,
                           description: `Fee for ${app.package_name}`,
                           debit: totalFormatted,
                           credit: ''
                         });
 
-                        // CREDIT: Payments
                         let totalPaid = 0;
                         if (app.payments && app.payments.length > 0) {
                           app.payments.forEach((payment, index) => {
@@ -234,7 +221,6 @@ const StudentPayment = () => {
                           });
                         }
 
-                        // BALANCE Row
                         const balance = totalAmount - totalPaid;
                         entries.push({
                           id: `balance-${app.application_id}`,
