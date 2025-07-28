@@ -3,9 +3,6 @@ import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import BookingList from '../Components/BookingList';
 import ResponsiveNavbar from '../Components/Navbar';
-import Modal from '@mui/material/Modal';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 
 const TutorBookingPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -44,14 +41,11 @@ const TutorBookingPage = () => {
     try {
       await apiService.put(`/bookings/${bookingId}/confirm`);
       setBookings(prev => prev.map(b =>
-        b.booking_id === bookingId
-          ? { ...b, booking_status: 'accepted' }
-          : b
+        b.booking_id === bookingId ? { ...b, booking_status: 'accepted' } : b
       ));
       setAlert({ message: 'Booking accepted', severity: 'success', show: true });
     } catch (err) {
       console.error('Error accepting booking:', err);
-      
       const status = err.response?.status;
       const msg = err.response?.data?.error || 'Failed to accept booking.';
 
@@ -163,67 +157,57 @@ const TutorBookingPage = () => {
         </div>
       )}
 
-      <Modal
-        open={cancelModalOpen}
-        onClose={() => setCancelModalOpen(false)}
-        aria-labelledby="cancel-booking-modal"
-        aria-describedby="cancel-booking-description"
-      >
-        <Box sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 400,
-          bgcolor: 'background.paper',
-          boxShadow: 24,
-          p: 4,
-          borderRadius: 2
-        }}>
-          <h2 className="text-xl font-bold mb-4">Cancel Booking</h2>
-          <div className="mb-4">
-            <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-2">
-              Reason for cancellation
-            </label>
-            <select
-              id="cancel-reason"
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              required
-            >
-              <option value="">Select a reason</option>
-              <option value="sick leave">Sick Leave</option>
-              <option value="unavailable">Unavailable</option>
-              <option value="conflict">Personal Schedule Conflict</option>
-              <option value="other">Other</option>
-            </select>
-            {cancelReason === 'other' && (
-              <input
-                type="text"
-                className="mt-2 w-full p-2 border border-gray-300 rounded-md"
-                placeholder="Please specify your reason"
-                value={otherReason || ''}
-                onChange={e => setOtherReason(e.target.value)}
+      {/* Tailwind Modal */}
+      {cancelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-md w-full max-w-md shadow-lg">
+            <h2 className="text-xl font-bold mb-4">Cancel Booking</h2>
+            <div className="mb-4">
+              <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for cancellation
+              </label>
+              <select
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md"
                 required
-              />
-            )}
+              >
+                <option value="">Select a reason</option>
+                <option value="sick leave">Sick Leave</option>
+                <option value="unavailable">Unavailable</option>
+                <option value="conflict">Personal Schedule Conflict</option>
+                <option value="other">Other</option>
+              </select>
+              {cancelReason === 'other' && (
+                <input
+                  type="text"
+                  className="mt-2 w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="Please specify your reason"
+                  value={otherReason || ''}
+                  onChange={e => setOtherReason(e.target.value)}
+                  required
+                />
+              )}
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-100"
+                onClick={() => setCancelModalOpen(false)}
+              >
+                Back
+              </button>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                onClick={handleCancelConfirm}
+                disabled={!cancelReason}
+              >
+                Confirm Cancellation
+              </button>
+            </div>
           </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outlined" onClick={() => setCancelModalOpen(false)}>
-              Back
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={handleCancelConfirm}
-              disabled={!cancelReason}
-            >
-              Confirm Cancellation
-            </Button>
-          </div>
-        </Box>
-      </Modal>
+        </div>
+      )}
     </>
   );
 };

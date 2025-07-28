@@ -3,10 +3,6 @@ import Alert from '@mui/material/Alert';
 import apiService from '../utils/apiService';
 import BookingList from '../Components/BookingList';
 import ResponsiveNavbar from '../Components/Navbar';
-import Modal from '@mui/material/Modal';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
 
 const StudentBookingPage2 = () => {
   const studentId = sessionStorage.getItem('user_id');
@@ -22,7 +18,6 @@ const StudentBookingPage2 = () => {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
 
-  // NEW: Application selection
   const [selectedAppId, setSelectedAppId] = useState('');
   const [preservedAppId, setPreservedAppId] = useState('');
 
@@ -50,9 +45,9 @@ const StudentBookingPage2 = () => {
 
     try {
       await apiService.patch(`/bookings/${selectedBookingId}/cancel`);
-      setBookings(prev => 
-        prev.map(booking => 
-          booking.booking_id === selectedBookingId 
+      setBookings(prev =>
+        prev.map(booking =>
+          booking.booking_id === selectedBookingId
             ? { ...booking, booking_status: 'cancelled' }
             : booking
         )
@@ -75,7 +70,6 @@ const StudentBookingPage2 = () => {
     }
   };
 
-  // Alert fade animation
   useEffect(() => {
     if (alert.show) {
       const fadeTimer = setTimeout(() => setFadeOut(true), 3500);
@@ -91,7 +85,6 @@ const StudentBookingPage2 = () => {
     }
   }, [alert]);
 
-  // Initial fetch
   useEffect(() => {
     if (studentId) {
       fetchBookings();
@@ -100,7 +93,6 @@ const StudentBookingPage2 = () => {
     }
   }, [studentId, fetchBookings]);
 
-  // Preserve application selection
   useEffect(() => {
     if (selectedAppId) {
       setPreservedAppId(selectedAppId);
@@ -125,11 +117,9 @@ const StudentBookingPage2 = () => {
           {loading && (
             <p className="text-center text-gray-600">Loading your bookings...</p>
           )}
-
           {error && (
             <p className="text-center text-red-600">{error}</p>
           )}
-
           {!loading && !error && (
             <BookingList
               bookings={bookings}
@@ -142,11 +132,8 @@ const StudentBookingPage2 = () => {
           )}
         </div>
 
-        {/* Alert notification */}
         {alert.show && (
-          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${
-            fadeOut ? 'opacity-0' : 'opacity-100'
-          }`}>
+          <div className={`fixed top-28 right-4 z-50 transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}>
             <Alert
               severity={alert.severity}
               onClose={() => setAlert(prev => ({ ...prev, show: false }))}
@@ -157,48 +144,29 @@ const StudentBookingPage2 = () => {
           </div>
         )}
 
-        {/* Cancel Confirmation Modal */}
-        <Modal
-          open={cancelModalOpen}
-          onClose={() => setCancelModalOpen(false)}
-          aria-labelledby="cancel-booking-modal"
-          aria-describedby="cancel-booking-confirmation"
-        >
-          <Box sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 400,
-            bgcolor: 'background.paper',
-            boxShadow: 24,
-            p: 4,
-            borderRadius: 2,
-            outline: 'none'
-          }}>
-            <Typography id="cancel-booking-modal" variant="h6" component="h2" sx={{ mb: 2 }}>
-              Confirm Cancellation
-            </Typography>
-            <Typography id="cancel-booking-confirmation" sx={{ mb: 3 }}>
-              Are you sure you want to cancel this booking?
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-              <Button 
-                variant="outlined" 
-                onClick={() => setCancelModalOpen(false)}
-              >
-                No, Keep Booking
-              </Button>
-              <Button 
-                variant="contained" 
-                color="error"
-                onClick={handleCancelConfirm}
-              >
-                Yes, Cancel Booking
-              </Button>
-            </Box>
-          </Box>
-        </Modal>
+        {/* Tailwind Cancel Confirmation Modal */}
+        {cancelModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-md w-full max-w-md shadow-lg">
+              <h2 className="text-lg font-semibold mb-2">Confirm Cancellation</h2>
+              <p className="text-sm text-gray-700 mb-4">Are you sure you want to cancel this booking?</p>
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setCancelModalOpen(false)}
+                  className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100"
+                >
+                  No, Keep Booking
+                </button>
+                <button
+                  onClick={handleCancelConfirm}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Yes, Cancel Booking
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
