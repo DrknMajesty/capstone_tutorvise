@@ -98,7 +98,7 @@ exports.submitApplication = async (req, res) => {
       ]
     );
 
-    // Update timeslot status
+    // Update timeslot status from avaialble to pending
     await db.query(
       `UPDATE timeslots SET status = 'pending' WHERE id = ?`,
       [timeslot_id]
@@ -357,9 +357,16 @@ exports.acceptBooking = async (req, res) => {
     const acceptedCount = acceptedCountResult[0].accepted_count;
     let applicationMarkedDone = false;
 
-    // 6. If all sessions accepted, conditionally mark application as 'done'
+    // 6. If all sessions accepted, update timeslot and maybe application
     if (acceptedCount === booking.total_sessions) {
-      // Check payment status based on paymentType
+      // 6.1 Always update timeslot to 'available'
+      await connection.query(`
+        UPDATE timeslots
+        SET status = 'available'
+        WHERE id = ?
+      `, [booking.timeslot_id]);
+
+      // 6.2 Conditionally update application to 'done' based on payment status
       const [payments] = await connection.query(`
         SELECT COUNT(*) AS confirmed_count
         FROM payments
@@ -382,12 +389,6 @@ exports.acceptBooking = async (req, res) => {
       );
 
       if (shouldMarkAsDone) {
-        await connection.query(`
-          UPDATE timeslots
-          SET status = 'available'
-          WHERE id = ?
-        `, [booking.timeslot_id]);
-
         await connection.query(`
           UPDATE applications
           SET application_status = 'done'
@@ -415,8 +416,8 @@ exports.acceptBooking = async (req, res) => {
     await createNotification(booking.tutor_id, tutorMessage);
 
     if (applicationMarkedDone) {
-      const succesMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`;
-      await createNotification(booking.student_id, succesMessage);
+      const successMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`;
+      await createNotification(booking.student_id, successMessage);
     }
 
     res.status(200).json({
@@ -432,7 +433,6 @@ exports.acceptBooking = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 // Get bookings of a student
 exports.getBookingsByStudent = async (req, res) => {

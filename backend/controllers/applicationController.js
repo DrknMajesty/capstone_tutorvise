@@ -617,113 +617,113 @@ exports.confirmOrRejectPayment = async (req, res) => {
 
     const payment = rows[0];
 
-if (action === 'confirm') {
-  // 1. Mark payment as confirmed
-  await db.query(
-    `UPDATE payments SET is_confirmed = 1 WHERE id = ?`,
-    [paymentId]
-  );
-
-  // 2. If application is still submitted, update it to approved and set expires_at
-  const [appStatusRows] = await db.query(
-    `SELECT application_status, timeslot_id FROM applications WHERE id = ?`,
-    [payment.application_id]
-  );
-
-  const currentStatus = appStatusRows[0]?.application_status;
-  const timeslotId = appStatusRows[0]?.timeslot_id;
-
-  if (currentStatus === 'submitted') {
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1); // Set expiration to 1 month from now
-
-    // Approve the application
-    await db.query(
-      `UPDATE applications SET application_status = 'approved', expires_at = ? WHERE id = ?`,
-      [expiresAt, payment.application_id]
-    );
-
-    // Mark the associated timeslot as 'booked'
-    if (timeslotId) {
+    if (action === 'confirm') {
+      // 1. Mark payment as confirmed
       await db.query(
-        `UPDATE timeslots SET status = 'booked' WHERE id = ?`,
-        [timeslotId]
+        `UPDATE payments SET is_confirmed = 1 WHERE id = ?`,
+        [paymentId]
       );
-    }
-  }
 
-  // 3. Count confirmed partial and full payments
-  const [partialConfirmed] = await db.query(`
-    SELECT COUNT(*) AS count
-    FROM payments
-    WHERE application_id = ? AND is_partial = 1 AND is_confirmed = 1
-  `, [payment.application_id]);
+      // 2. If application is still submitted, update it to approved and set expires_at
+      const [appStatusRows] = await db.query(
+        `SELECT application_status, timeslot_id FROM applications WHERE id = ?`,
+        [payment.application_id]
+      );
 
-  const [fullConfirmed] = await db.query(`
-    SELECT COUNT(*) AS count
-    FROM payments
-    WHERE application_id = ? AND is_partial = 0 AND is_confirmed = 1
-  `, [payment.application_id]);
+      const currentStatus = appStatusRows[0]?.application_status;
+      const timeslotId = appStatusRows[0]?.timeslot_id;
 
-  // 4. Check accepted bookings vs total sessions
-  const [bookingStats] = await db.query(`
-    SELECT 
-      COUNT(*) AS accepted_count,
-      MAX(p.total_sessions) AS total_sessions
-    FROM bookings b
-    JOIN applications a ON b.application_id = a.id
-    JOIN packages p ON a.package_id = p.id
-    WHERE b.application_id = ? AND b.status = 'accepted'
-  `, [payment.application_id]);
+      if (currentStatus === 'submitted') {
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1); // Set expiration to 1 month from now
 
-  const acceptedCount = bookingStats[0].accepted_count;
-  const totalSessions = bookingStats[0].total_sessions;
+        // Approve the application
+        await db.query(
+          `UPDATE applications SET application_status = 'approved', expires_at = ? WHERE id = ?`,
+          [expiresAt, payment.application_id]
+        );
 
-  // 5. Determine if conditions are met to mark application as done
-  const paymentConditionMet = (partialConfirmed[0].count >= 2) || (fullConfirmed[0].count >= 1);
-  const bookingConditionMet = acceptedCount === totalSessions;
-
-  if (paymentConditionMet && bookingConditionMet) {
-    await db.query(
-      `UPDATE applications SET application_status = 'done' WHERE id = ?`,
-      [payment.application_id]
-    );
-  }
-
-  return res.json({ message: 'Payment confirmed successfully.' });
-}
-
-else if (action === 'reject') {
-    // Remove the payment record entirely
-    const [proofRow] = await db.query(
-      `SELECT payment_proof, application_id FROM payments WHERE id = ?`,
-      [paymentId]
-    );
-
-    if (proofRow.length > 0) {
-      const { payment_proof, application_id } = proofRow[0];
-
-      // Delete the payment proof file if it exists
-      if (payment_proof) {
-        const fs = require('fs');
-        const filePath = `./uploads/payment_proofs/${payment_proof}`;
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        // Mark the associated timeslot from 'pending' to 'booked'
+        if (timeslotId) {
+          await db.query(
+            `UPDATE timeslots SET status = 'booked' WHERE id = ?`,
+            [timeslotId]
+          );
         }
       }
 
-      // Delete the payment record
-      await db.query(`DELETE FROM payments WHERE id = ?`, [paymentId]);
+      // 3. Count confirmed partial and full payments
+      const [partialConfirmed] = await db.query(`
+        SELECT COUNT(*) AS count
+        FROM payments
+        WHERE application_id = ? AND is_partial = 1 AND is_confirmed = 1
+      `, [payment.application_id]);
 
-      // Update the application status to 'pending'
-      await db.query(
-        `UPDATE applications SET application_status = 'pending' WHERE id = ? AND application_status = 'submitted'`,
-        [application_id]
-      );
+      const [fullConfirmed] = await db.query(`
+        SELECT COUNT(*) AS count
+        FROM payments
+        WHERE application_id = ? AND is_partial = 0 AND is_confirmed = 1
+      `, [payment.application_id]);
+
+      // 4. Check accepted bookings vs total sessions
+      const [bookingStats] = await db.query(`
+        SELECT 
+          COUNT(*) AS accepted_count,
+          MAX(p.total_sessions) AS total_sessions
+        FROM bookings b
+        JOIN applications a ON b.application_id = a.id
+        JOIN packages p ON a.package_id = p.id
+        WHERE b.application_id = ? AND b.status = 'accepted'
+      `, [payment.application_id]);
+
+      const acceptedCount = bookingStats[0].accepted_count;
+      const totalSessions = bookingStats[0].total_sessions;
+
+      // 5. Determine if conditions are met to mark application as done
+      const paymentConditionMet = (partialConfirmed[0].count >= 2) || (fullConfirmed[0].count >= 1);
+      const bookingConditionMet = acceptedCount === totalSessions;
+
+      if (paymentConditionMet && bookingConditionMet) {
+        await db.query(
+          `UPDATE applications SET application_status = 'done' WHERE id = ?`,
+          [payment.application_id]
+        );
+      }
+
+      return res.json({ message: 'Payment confirmed successfully.' });
     }
 
-    return res.json({ message: 'Payment proof rejected, deleted, and application status set to pending.' });
-  }
+    else if (action === 'reject') {
+        // Remove the payment record entirely
+        const [proofRow] = await db.query(
+          `SELECT payment_proof, application_id FROM payments WHERE id = ?`,
+          [paymentId]
+        );
+
+        if (proofRow.length > 0) {
+          const { payment_proof, application_id } = proofRow[0];
+
+          // Delete the payment proof file if it exists
+          if (payment_proof) {
+            const fs = require('fs');
+            const filePath = `./uploads/payment_proofs/${payment_proof}`;
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+
+          // Delete the payment record
+          await db.query(`DELETE FROM payments WHERE id = ?`, [paymentId]);
+
+          // Update the application status to 'pending'
+          await db.query(
+            `UPDATE applications SET application_status = 'pending' WHERE id = ? AND application_status = 'submitted'`,
+            [application_id]
+          );
+        }
+
+        return res.json({ message: 'Payment proof rejected, deleted, and application status set to pending.' });
+      }
 
   } catch (err) {
     console.error('Admin payment confirmation error:', err);
