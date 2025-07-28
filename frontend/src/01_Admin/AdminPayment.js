@@ -13,6 +13,8 @@ const AdminApplicationManagementPage = () => {
   const [visiblePaymentAppId, setVisiblePaymentAppId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [proofUrl, setProofUrl] = useState('');
   const itemsPerPage = 4;
 
   useEffect(() => {
@@ -53,20 +55,17 @@ const AdminApplicationManagementPage = () => {
     setVisiblePaymentAppId((prev) => (prev === appId ? null : appId));
   };
 
-    const [showModal, setShowModal] = useState(false);
-    const [proofUrl, setProofUrl] = useState('');
-
-    const openModal = (url) => {
+  const openModal = (url) => {
     setProofUrl(url);
     setShowModal(true);
-    };
+  };
 
-    const closeModal = () => {
+  const closeModal = () => {
     setShowModal(false);
     setProofUrl('');
-    };
+  };
 
-const handleConfirmPayment = async (paymentId) => {
+  const handleConfirmPayment = async (paymentId) => {
   try {
     const res = await apiService.post(`/applications/payments/${paymentId}/action`, { 
       action: 'confirm'
@@ -77,24 +76,24 @@ const handleConfirmPayment = async (paymentId) => {
     }
   } catch (err) {
     console.error(err);
-    setAlert({ message: 'Payment Confirmatino Failed.', severity: 'error', show: true });
+    setAlert({ message: 'Payment Confirmation Failed.', severity: 'error', show: true });
   }
-};
+  };
 
-const handleRejectPayment = async (paymentId) => {
-  try {
-    const res = await apiService.post(`/applications/payments/${paymentId}/action`, {
-      action: 'reject'
-    });
-    if (res.status === 200) {
-      setAlert({ type: 'warning', message: res.data.message || 'Payment rejected successfully.' });
-      fetchApplications(); // Refresh data
+  const handleRejectPayment = async (paymentId) => {
+    try {
+      const res = await apiService.post(`/applications/payments/${paymentId}/action`, {
+        action: 'reject'
+      });
+      if (res.status === 200) {
+        setAlert({ message: 'Payment rejected successfully.', severity: 'success', show: true });
+        fetchApplications(); // Refresh data
+      }
+    } catch (err) {
+      console.error(err);
+      setAlert({ message: 'Payment Rejection Failed.', severity: 'error', show: true });
     }
-  } catch (err) {
-    console.error(err);
-    setAlert({ type: 'error', message: 'Payment rejection failed.', show: true });
-  }
-};
+  };
 
   const formatCurrency = (amount_paid) => `₱${Number(amount_paid).toFixed(2)}`;
 
@@ -174,7 +173,7 @@ const handleRejectPayment = async (paymentId) => {
                       Package: {app.package_name} | Tutor: {app.tutor_fname} {app.tutor_lname} | Time: {formatTimeRange(app.snapshot_start_time, app.snapshot_end_time)}
                     </p>
                     <p className="text-sm text-gray-500">
-                      Submitted: {new Date(app.created_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit', hour12: true})} | Payment Due: {new Date(app.payment_due_date).toLocaleString()}
+                      Applied At: {new Date(app.created_at).toLocaleString()}
                     </p>
                   </div>
                   <span className={`text-sm font-medium px-2 py-1 rounded capitalize ${

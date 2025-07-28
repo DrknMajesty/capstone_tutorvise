@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import ResponsiveNavbar from '../Components/Navbar';
 import apiService from '../utils/apiService';
 import jsPDF from 'jspdf';
@@ -101,6 +101,19 @@ const fetchFinance = useCallback(async () => {
     setActiveFilters({ start: '', end: '' });
   };
 
+  const filteredFeedback = useMemo(() => {
+    return tutorFeedback.filter(fb => {
+      const sessionDate = new Date(fb.scheduled_date);
+      const start = activeFilters.start ? new Date(activeFilters.start) : null;
+      const end = activeFilters.end ? new Date(activeFilters.end) : null;
+
+      if (start && sessionDate < start) return false;
+      if (end && sessionDate > end) return false;
+
+      return true;
+    });
+  }, [tutorFeedback, activeFilters]);
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
   };
@@ -108,12 +121,33 @@ const fetchFinance = useCallback(async () => {
 const handleDownloadPDF = () => {
   const doc = new jsPDF();
   const title = `TutorVise Report - ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`;
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(16);
   doc.text(title, 14, 20);
 
+  // Helper for displaying date range
+  const noFiltersUsed = !activeFilters.start && !activeFilters.end;
+  const startDate = noFiltersUsed
+    ? 'All Records'
+    : activeFilters.start
+      ? new Date(activeFilters.start).toLocaleDateString()
+      : 'N/A';
+  const endDate = noFiltersUsed
+    ? ''
+    : activeFilters.end
+      ? new Date(activeFilters.end).toLocaleDateString()
+      : 'N/A';
+
   if (activeTab === 'ratings') {
+    doc.setFontSize(10);
+    doc.text(
+      `Date Range: ${noFiltersUsed ? 'All Records' : `${startDate} - ${endDate}`}`,
+      14,
+      28
+    );
+
     autoTable(doc, {
-      startY: 30,
+      startY: 35,
       head: [['Rank', 'Tutor Name', 'Average Rating', 'Total Ratings']],
       body: ratingsData.map((tutor, idx) => [
         idx + 1,
@@ -124,50 +158,76 @@ const handleDownloadPDF = () => {
       theme: 'striped',
       styles: { fontSize: 10 },
     });
+
   } else if (activeTab === 'collection') {
-    doc.setFontSize(12);
-    doc.text(`Total Income: ₱${Number(financeData.income).toFixed(2)}`, 14, 30);
-    doc.text(`Total Receivables: ₱${Number(financeData.receivables).toFixed(2)}`, 14, 38);
+    doc.setFontSize(10);
+    doc.text(
+      `Date Range: ${noFiltersUsed ? 'All Records' : `${startDate} - ${endDate}`}`,
+      14,
+      28
+    );
+    doc.text(`Total Collection: PHP ${Number(financeData.totalCollection).toFixed(2)}`, 14, 36);
 
     autoTable(doc, {
-      startY: 45,
-      head: [['ID', 'Status', 'Student', 'Package', 'Submitted', 'Amount']],
-      body: financeData.applications.map(app => [
-        app.application_id,
-        app.application_status,
-        app.student_name,
-        app.package_name,
-        new Date(app.created_at).toLocaleDateString(),
-        `₱${Number(app.total_price).toFixed(2)}`
+      startY: 43,
+      head: [['Payment ID', 'Type', 'Student', 'Package', 'Date Paid', 'Amount Paid']],
+      body: financeData.payments.map(payment => [
+        payment.payment_id,
+        payment.is_partial ? 'Partial' : 'Full',
+        payment.student_name,
+        payment.package_name,
+        new Date(payment.payment_date).toLocaleDateString(),
+        `PHP ${Number(payment.amount_paid).toFixed(2)}`
       ]),
       styles: { fontSize: 9 },
       theme: 'grid',
       headStyles: { fillColor: [22, 160, 133] },
     });
+
   } else if (activeTab === 'comments') {
-    const tutor = ratingsData.find(t => t.tutor_id === selectedTutorId);
+    const tutor = ratingsData.find(t => t.tutor_id === parseInt(selectedTutorId));
+
+    const filteredFeedback = tutorFeedback.filter(fb => {
+      const fbDate = new Date(fb.scheduled_date);
+      const start = activeFilters.start ? new Date(activeFilters.start) : null;
+      const end = activeFilters.end ? new Date(activeFilters.end) : null;
+
+      if (start && fbDate < start) return false;
+      if (end && fbDate > end) return false;
+
+      return true;
+    });
+
     doc.setFontSize(12);
-    doc.text(`Tutor: ${tutor?.name || 'N/A'}`, 14, 30);
+    doc.text(`Tutor: ${tutor?.name || 'N/A'}`, 14, 28);
+    doc.setFontSize(10);
+    doc.text(
+      `Date Range: ${noFiltersUsed ? 'All Records' : `${startDate} - ${endDate}`}`,
+      14,
+      36
+    );
 
     autoTable(doc, {
-      startY: 38,
+      startY: 43,
       head: [['Date', 'Time', 'Student', 'Rating', 'Comment']],
-      body: tutorFeedback.map(fb => {
+      body: filteredFeedback.map(fb => {
         const date = new Date(fb.scheduled_date).toLocaleDateString();
-        const start = new Date(`1970-01-01T${fb.start_time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-        const end = new Date(`1970-01-01T${fb.end_time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        const startTime = new Date(`1970-01-01T${fb.start_time}`).toLocaleTimeString([], {
+          hour: '2-digit', minute: '2-digit', hour12: true
+        });
+        const endTime = new Date(`1970-01-01T${fb.end_time}`).toLocaleTimeString([], {
+          hour: '2-digit', minute: '2-digit', hour12: true
+        });
         return [
           date,
-          `${start} - ${end}`,
+          `${startTime} - ${endTime}`,
           fb.student_lname,
           '★'.repeat(fb.rating),
-          fb.comment
+          fb.comment,
         ];
       }),
       styles: { fontSize: 9, cellWidth: 'wrap' },
-      columnStyles: {
-        4: { cellWidth: 70 }
-      },
+      columnStyles: { 4: { cellWidth: 70 } },
       theme: 'striped',
       headStyles: { fillColor: [52, 73, 94] },
     });
@@ -176,254 +236,251 @@ const handleDownloadPDF = () => {
   doc.save(`${activeTab}-report.pdf`);
 };
 
-  return (
-    <div>
-      <ResponsiveNavbar username={username} />
-      <div className="h-24" />
-      <div className="max-w-5xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-6">Generate Report</h1>
+return (
+  <div>
+    <ResponsiveNavbar username={username} />
+    <div className="h-24" />
+    <div className="max-w-5xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">Generate Report</h1>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-2">
-            {['ratings', 'comments', 'collection'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  handleTabChange(tab);
-                  if (tab === 'comments') fetchRatings();
-                }}
-                className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
-                  activeTab === tab
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </nav>
-        </div>
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-2">
+          {['ratings', 'comments', 'collection'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                handleTabChange(tab);
+                if (tab === 'comments') fetchRatings();
+              }}
+              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
+                activeTab === tab
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-        {/* Filters */}
-        {(activeTab === 'ratings' || activeTab === 'collection') && (
-          <div className="mb-4 flex flex-col md:flex-row md:items-center md:gap-4">
-            <div>
-              <label className="block mb-1 text-sm font-medium">Start Date:</label>
-              <input
-                type="date"
-                value={dateInputs.start}
-                onChange={(e) => setDateInputs(prev => ({ ...prev, start: e.target.value }))}
-                className="border border-gray-300 px-3 py-1 rounded"
-              />
-            </div>
-            <div>
-              <label className="block mb-1 text-sm font-medium">End Date:</label>
-              <input
-                type="date"
-                value={dateInputs.end}
-                onChange={(e) => setDateInputs(prev => ({ ...prev, end: e.target.value }))}
-                className="border border-gray-300 px-3 py-1 rounded"
-              />
-            </div>
-            <div className="mt-4 md:mt-6 flex gap-2">
-              <button
-                onClick={handleFilterApply}
-                disabled={isLoading[activeTab] || (!dateInputs.start && !dateInputs.end)}
-                className={`bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ${
-                  isLoading[activeTab] ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {isLoading[activeTab] ? 'Loading...' : 'Apply Filters'}
-              </button>
-              <button
-                onClick={handleFilterReset}
-                disabled={isLoading[activeTab] || (!activeFilters.start && !activeFilters.end)}
-                className={`bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 ${
-                  isLoading[activeTab] ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                Reset
-              </button>
-            </div>
+{/* Filters + Download Button in one row */}
+{(activeTab === 'ratings' || activeTab === 'collection' || activeTab === 'comments') && (
+  <div className="mb-4 flex flex-col md:flex-row md:items-end md:justify-between md:gap-4">
+    {/* Filters Section */}
+    <div className="flex flex-col md:flex-row md:items-center md:gap-4">
+      <div>
+        <label className="block mb-1 text-sm font-medium">Start Date:</label>
+        <input
+          type="date"
+          value={dateInputs.start}
+          onChange={(e) => setDateInputs(prev => ({ ...prev, start: e.target.value }))}
+          className="border border-gray-300 px-3 py-1 rounded"
+        />
+      </div>
+      <div>
+        <label className="block mb-1 text-sm font-medium">End Date:</label>
+        <input
+          type="date"
+          value={dateInputs.end}
+          onChange={(e) => setDateInputs(prev => ({ ...prev, end: e.target.value }))}
+          className="border border-gray-300 px-3 py-1 rounded"
+        />
+      </div>
+      <div className="mt-4 md:mt-6 flex gap-2">
+        <button
+          onClick={handleFilterApply}
+          disabled={isLoading[activeTab] || (!dateInputs.start && !dateInputs.end)}
+          className={`bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ${
+            isLoading[activeTab] ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+        >
+          {isLoading[activeTab] ? 'Loading...' : 'Apply Filters'}
+        </button>
+        <button
+          onClick={handleFilterReset}
+          disabled={isLoading[activeTab] || (!activeFilters.start && !activeFilters.end)}
+          className={`bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 ${
+            isLoading[activeTab] ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+
+    {/* Export Button aligned right */}
+    <div className="mt-4 md:mt-6">
+      <button
+        onClick={handleDownloadPDF}
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+      >
+        Export Report as PDF
+      </button>
+    </div>
+  </div>
+)}
+
+
+      {/* Report Content */}
+      <div id="report-content">
+        {activeTab === 'collection' && (
+          <div className="bg-gray-100 p-6 rounded shadow mb-8">
+            <h2 className="text-xl font-semibold mb-4">Collection Report</h2>
+            {isLoading.collection ? (
+              <p>Loading payment collection data...</p>
+            ) : (
+              <>
+                <p className="text-lg">
+                  Total Collection: <strong>₱{Number(financeData.totalCollection || 0).toFixed(2)}</strong>
+                </p>
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-2">Payment Details</h3>
+                  {financeData.payments?.length === 0 ? (
+                    <p className="text-gray-500 italic">
+                      {activeFilters.start || activeFilters.end
+                        ? 'No payments found for the selected date range.'
+                        : 'No payment records available.'}
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border border-gray-300 text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="border px-4 py-2">Payment ID</th>
+                            <th className="border px-4 py-2">Type</th>
+                            <th className="border px-4 py-2">Student</th>
+                            <th className="border px-4 py-2">Package</th>
+                            <th className="border px-4 py-2">Date Paid</th>
+                            <th className="border px-4 py-2">Amount Paid</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeData.payments.map((payment, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="border px-4 py-2">{payment.payment_id}</td>
+                              <td className="border px-4 py-2">{payment.is_partial ? 'Partial' : 'Full'}</td>
+                              <td className="border px-4 py-2">{payment.student_name}</td>
+                              <td className="border px-4 py-2">{payment.package_name}</td>
+                              <td className="border px-4 py-2">
+                                {new Date(payment.payment_date).toLocaleDateString()}
+                              </td>
+                              <td className="border px-4 py-2">
+                                ₱{Number(payment.amount_paid).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
-        {/* Download Button */}
-        <div className="mb-4">
-          <button
-            onClick={handleDownloadPDF}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            Download PDF
-          </button>
-        </div>
-
-        {/* Report Content */}
-        <div id="report-content">
-{activeTab === 'collection' && (
-  <div className="bg-gray-100 p-6 rounded shadow mb-8">
-    <h2 className="text-xl font-semibold mb-4">Collection Report</h2>
-    {isLoading.collection ? (
-      <p>Loading payment collection data...</p>
-    ) : (
-      <>
-        <p className="text-lg">
-          Total Collection:{' '}
-          <strong>₱{Number(financeData.totalCollection || 0).toFixed(2)}</strong>
-        </p>
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-2">Payment Details</h3>
-          {financeData.payments?.length === 0 ? (
-            <p className="text-gray-500 italic">
-              {activeFilters.start || activeFilters.end
-                ? 'No payments found for the selected date range.'
-                : 'No payment records available.'}
-            </p>
+        {activeTab === 'ratings' && (
+          isLoading.ratings ? (
+            <p>Loading ratings data...</p>
           ) : (
+            <div className="overflow-x-auto mb-8">
+              {ratingsData.filter(t => t.rating_count > 0).length === 0 ? (
+                <p className="text-gray-500">No tutor ratings available.</p>
+              ) : (
+                <table className="min-w-full table-auto border border-gray-300 text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border px-4 py-2 text-left">Rank</th>
+                      <th className="border px-4 py-2 text-left">Tutor Name</th>
+                      <th className="border px-4 py-2 text-left">Average Rating</th>
+                      <th className="border px-4 py-2 text-left">Total Ratings</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ratingsData
+                      .filter(tutor => tutor.rating_count > 0)
+                      .map((tutor, index) => (
+                        <tr key={tutor.tutor_id} className="hover:bg-gray-50">
+                          <td className="border px-4 py-2">{index + 1}</td>
+                          <td className="border px-4 py-2">{tutor.name}</td>
+                          <td className="border px-4 py-2">{Number(tutor.average_rating).toFixed(2)}</td>
+                          <td className="border px-4 py-2">{tutor.rating_count}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )
+        )}
+
+
+      {activeTab === 'comments' && (
+        <div className="space-y-6">
+<div>
+  <label className="block mb-2 font-medium">Select Tutor:</label>
+  <select
+    value={selectedTutorId}
+    onChange={(e) => {
+      setSelectedTutorId(e.target.value);
+      fetchTutorFeedback(e.target.value);
+    }}
+    className="border border-gray-300 rounded px-3 py-2"
+    disabled={ratingsData.length === 0}
+  >
+    <option value="">-- Select Tutor --</option>
+    {ratingsData.map(tutor => (
+      <option key={tutor.tutor_id} value={tutor.tutor_id}>{tutor.name}</option>
+    ))}
+  </select>
+</div>
+
+          {isLoading.feedback ? (
+            <p>Loading feedback...</p>
+          ) : selectedTutorId && filteredFeedback.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full border border-gray-300 text-sm">
+              <table className="min-w-full table-auto border border-gray-300 text-sm">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border px-4 py-2">Payment ID</th>
-                    <th className="border px-4 py-2">Type</th>
+                    <th className="border px-4 py-2">Date</th>
+                    <th className="border px-4 py-2">Time</th>
                     <th className="border px-4 py-2">Student</th>
-                    <th className="border px-4 py-2">Package</th>
-                    <th className="border px-4 py-2">Date Paid</th>
-                    <th className="border px-4 py-2">Amount Paid</th>
+                    <th className="border px-4 py-2">Rating</th>
+                    <th className="border px-4 py-2">Comment</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {financeData.payments.map((payment, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="border px-4 py-2">{payment.payment_id}</td>
-                      <td className="border px-4 py-2">{payment.is_partial ? 'Partial' : 'Full'}</td>
-                      <td className="border px-4 py-2">{payment.student_name}</td>
-                      <td className="border px-4 py-2">{payment.package_name}</td>
+                  {filteredFeedback.map((fb, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="border px-4 py-2">{new Date(fb.scheduled_date).toLocaleDateString()}</td>
                       <td className="border px-4 py-2">
-                        {new Date(payment.payment_date).toLocaleDateString()}
+                        {new Date(`1970-01-01T${fb.start_time}`).toLocaleTimeString([], {
+                          hour: '2-digit', minute: '2-digit', hour12: true,
+                        })} - {new Date(`1970-01-01T${fb.end_time}`).toLocaleTimeString([], {
+                          hour: '2-digit', minute: '2-digit', hour12: true,
+                        })}
                       </td>
-                      <td className="border px-4 py-2">
-                        ₱{Number(payment.amount_paid).toFixed(2)}
+                      <td className="border px-4 py-2">{fb.student_lname}</td>
+                      <td className="border px-4 py-2 text-yellow-500">
+                        {'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}
                       </td>
+                      <td className="border px-4 py-2 italic text-gray-700">{fb.comment}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
+          ) : selectedTutorId ? (
+            <p className="text-gray-500">No feedback available for this tutor.</p>
+          ) : null}
         </div>
-      </>
-    )}
-  </div>
-)}
-
-
-{activeTab === 'ratings' && (
-  isLoading.ratings ? (
-    <p>Loading ratings data...</p>
-  ) : (
-    <div className="overflow-x-auto mb-8">
-      {ratingsData.filter(t => t.rating_count > 0).length === 0 ? (
-        <p className="text-gray-500">No tutor ratings available.</p>
-      ) : (
-        <table className="min-w-full table-auto border border-gray-300 text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-4 py-2 text-left">Rank</th>
-              <th className="border px-4 py-2 text-left">Tutor Name</th>
-              <th className="border px-4 py-2 text-left">Average Rating</th>
-              <th className="border px-4 py-2 text-left">Total Ratings</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ratingsData
-              .filter(tutor => tutor.rating_count > 0)
-              .map((tutor, index) => (
-                <tr key={tutor.tutor_id} className="hover:bg-gray-50">
-                  <td className="border px-4 py-2">{index + 1}</td>
-                  <td className="border px-4 py-2">{tutor.name}</td>
-                  <td className="border px-4 py-2">{Number(tutor.average_rating).toFixed(2)}</td>
-                  <td className="border px-4 py-2">{tutor.rating_count}</td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
       )}
-    </div>
-  )
-)}
-
-
-          {activeTab === 'comments' && (
-            <div className="space-y-6">
-              <div className="mb-6">
-                <label className="block mb-2 font-medium">Select a Tutor to View Feedback:</label>
-                <select
-                  value={selectedTutorId}
-                  onChange={(e) => {
-                    setSelectedTutorId(e.target.value);
-                    fetchTutorFeedback(e.target.value);
-                  }}
-                  className="border border-gray-300 rounded px-3 py-2"
-                  disabled={isLoading.feedback || ratingsData.length === 0}
-                >
-                  <option value="">-- Select Tutor --</option>
-                  {ratingsData.map(tutor => (
-                    <option key={tutor.tutor_id} value={tutor.tutor_id}>{tutor.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {isLoading.feedback ? (
-                <p>Loading feedback...</p>
-              ) : selectedTutorId && tutorFeedback.length > 0 ? (
-                <div>
-                  <h2 className="text-xl font-semibold mb-4">Confirmed Sessions Feedback</h2>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full table-auto border border-gray-300 text-sm">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="border px-4 py-2 text-left">Date</th>
-                          <th className="border px-4 py-2 text-left">Time</th>
-                          <th className="border px-4 py-2 text-left">Student</th>
-                          <th className="border px-4 py-2 text-left">Rating</th>
-                          <th className="border px-4 py-2 text-left">Comment</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tutorFeedback.map((fb, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="border px-4 py-2">{new Date(fb.scheduled_date).toLocaleDateString()}</td>
-                            <td className="border px-4 py-2">
-                              {new Date(`1970-01-01T${fb.start_time}`).toLocaleTimeString([], {
-                                hour: '2-digit', minute: '2-digit', hour12: true,
-                              })} - {new Date(`1970-01-01T${fb.end_time}`).toLocaleTimeString([], {
-                                hour: '2-digit', minute: '2-digit', hour12: true,
-                              })}
-                            </td>
-                            <td className="border px-4 py-2">{fb.student_lname}</td>
-                            <td className="border px-4 py-2">
-                              <div className="flex text-yellow-500 text-sm">
-                                {'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}
-                              </div>
-                            </td>
-                            <td className="border px-4 py-2 italic text-gray-700">{fb.comment}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : selectedTutorId ? (
-                <p className="text-gray-500">No feedback available for this tutor.</p>
-              ) : null}
-            </div>
-          )}
-        </div>
       </div>
     </div>
-  );
-};
+  </div>
+);
+} 
 
 export default AdminReportPage;
