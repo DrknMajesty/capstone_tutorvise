@@ -1,6 +1,7 @@
 const db = require('../db');
 const expireOldApplications = require('../utils/expireApplications');
 const { createNotification } = require('../utils/notification');
+const { sendEmail } = require('../utils/emailService');
 
 exports.getMyApplication = async (req, res) => {
   const studentId = req.user.id;

@@ -1,5 +1,8 @@
 const db = require('../db');
 const { createNotification } = require('../utils/notification');
+// 🔼 At the top of the file
+const { sendEmail } = require('../utils/emailService');
+
 
 // Get Active Packages
 exports.getActivePackage = async (req, res) => {
@@ -255,23 +258,25 @@ exports.acceptBooking = async (req, res) => {
 
     // 1. Fetch booking details
     const [bookings] = await connection.query(`
-      SELECT 
-        bookings.*, 
-        applications.snapshot_start_time, 
-        applications.snapshot_end_time,
-        applications.timeslot_id,
-        applications.package_id,
-        applications.id AS application_id,
-        packages.total_sessions,
-        packages.package_name,
-        CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
-        CONCAT(student.fname, ' ', student.lname) AS student_name
-      FROM bookings
-      JOIN applications ON bookings.application_id = applications.id
-      JOIN packages ON applications.package_id = packages.id
-      JOIN users AS tutor ON bookings.tutor_id = tutor.id
-      JOIN users AS student ON bookings.student_id = student.id
-      WHERE bookings.id = ?
+SELECT 
+  bookings.*, 
+  applications.snapshot_start_time, 
+  applications.snapshot_end_time,
+  applications.timeslot_id,
+  applications.package_id,
+  applications.id AS application_id,
+  packages.total_sessions,
+  packages.package_name,
+  CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
+  CONCAT(student.fname, ' ', student.lname) AS student_name,
+  tutor.email AS tutor_email,
+  student.email AS student_email
+FROM bookings
+JOIN applications ON bookings.application_id = applications.id
+JOIN packages ON applications.package_id = packages.id
+JOIN users AS tutor ON bookings.tutor_id = tutor.id
+JOIN users AS student ON bookings.student_id = student.id
+WHERE bookings.id = ?
     `, [bookingId]);
 
     if (bookings.length === 0) {
@@ -403,7 +408,7 @@ exports.acceptBooking = async (req, res) => {
     await connection.commit();
     connection.release();
 
-    // 8. Send notifications
+    // 8. Send In App Notifications
     const sessionDate = new Date(booking.session_date);
     const formattedDate = sessionDate.toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -414,6 +419,27 @@ exports.acceptBooking = async (req, res) => {
 
     await createNotification(booking.student_id, studentMessage);
     await createNotification(booking.tutor_id, tutorMessage);
+
+    // ✉️ EMAIL NOTIFICATIONS — ADDED HERE
+    if (booking.student_email && booking.tutor_email) {
+      const emailSubject = 'TutorVise: Booking Accepted';
+
+      const studentEmailBody = `
+        <p>Dear ${booking.student_name},</p>
+        <p>Your tutorial session on <strong>${formattedDate}</strong> with <strong>${booking.tutor_name}</strong> has been accepted.</p>
+        <p>Please prepare accordingly. Thank you for using <strong>TutorVise</strong>.</p>
+      `;
+
+      const tutorEmailBody = `
+        <p>Dear ${booking.tutor_name},</p>
+        <p>You have successfully accepted a booking with <strong>${booking.student_name}</strong> scheduled on <strong>${formattedDate}</strong>.</p>
+        <p>Thank you for confirming this session.</p>
+      `;
+
+      await sendEmail(booking.student_email, emailSubject, studentEmailBody);
+      await sendEmail(booking.tutor_email, emailSubject, tutorEmailBody);
+    }
+    // If application is marked as done, notify the student
 
     if (applicationMarkedDone) {
       const successMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`;
