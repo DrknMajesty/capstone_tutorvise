@@ -27,7 +27,6 @@ exports.getActivePackage = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 }
-
 // controllers/bookingController.js
 exports.getAvailableTimeslots = async (req, res) => {
   try {
@@ -68,7 +67,7 @@ exports.submitApplication = async (req, res) => {
 
     // Fetch package details
     const [packageRows] = await db.query(
-      `SELECT price_package, price_sessions, total_sessions FROM packages WHERE id = ?`,
+      `SELECT price_package, price_sessions, total_sessions, package_name FROM packages WHERE id = ?`,
       [package_id]
     );
 
@@ -76,10 +75,15 @@ exports.submitApplication = async (req, res) => {
       return res.status(404).json({ message: 'Package not found.' });
     }
 
-    const { price_package, price_sessions, total_sessions } = packageRows[0];
+    const { price_package, price_sessions, total_sessions, package_name } = packageRows[0];
 
-    // Calculate total cost from session price * session count
-    // const package_cost = parseFloat(price_package) + (parseFloat(price_sessions) * parseInt(total_sessions));
+    // Fetch student info
+    const [studentRows] = await db.query(
+      `SELECT CONCAT(fname, ' ', lname) AS student_name FROM users WHERE id = ?`,
+      [student_id]
+    );
+
+    const student_name = studentRows[0]?.student_name || 'A student';
 
     // 12-hour deadline
     const deadline = new Date(Date.now() + 12 * 60 * 60 * 1000);
@@ -101,19 +105,38 @@ exports.submitApplication = async (req, res) => {
       ]
     );
 
-    // Update timeslot status from avaialble to pending
+    // Update timeslot status
     await db.query(
       `UPDATE timeslots SET status = 'pending' WHERE id = ?`,
       [timeslot_id]
     );
 
+    // ✅ ✅ EMAIL NOTIFICATION TO ALL ADMINS
+    const [adminUsers] = await db.query(
+      `SELECT email FROM users WHERE account_type = 'admin'`
+    );
+
+    const emailSubject = 'TutorVise: New Application Submitted';
+    const emailBody = `
+      <p>Dear Admin,</p>
+      <p><strong>${student_name}</strong> has submitted a new application for the package: <strong>${package_name}</strong>.</p>
+      <p>Please review and confirm the payment once submitted.</p>
+      <p>Regards,<br/>TutorVise System</p>
+    `;
+
+    for (const admin of adminUsers) {
+      if (admin.email) {
+        await sendEmail(admin.email, emailSubject, emailBody);
+      }
+    }
+
     res.json({ message: 'Application submitted successfully.', deadline });
+
   } catch (err) {
     console.error('Error submitting application:', err);
     res.status(500).json({ message: 'Server error.' });
   }
 };
-
 // 
 exports.scheduleSessions = async (req, res) => {
   const { application_id, dates } = req.body;
@@ -166,7 +189,6 @@ exports.scheduleSessions = async (req, res) => {
     return res.status(500).json({ message: 'Failed to book sessions' });
   }
 };
-
 // Get Application with Bookings
 exports.getAllApplicationsWithBookings = async (req, res) => {
   try {
@@ -256,38 +278,36 @@ exports.acceptBooking = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Fetch booking details
+    // 1. Fetch booking and related details
     const [bookings] = await connection.query(`
-SELECT 
-  bookings.*, 
-  applications.snapshot_start_time, 
-  applications.snapshot_end_time,
-  applications.timeslot_id,
-  applications.package_id,
-  applications.id AS application_id,
-  packages.total_sessions,
-  packages.package_name,
-  CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
-  CONCAT(student.fname, ' ', student.lname) AS student_name,
-  tutor.email AS tutor_email,
-  student.email AS student_email
-FROM bookings
-JOIN applications ON bookings.application_id = applications.id
-JOIN packages ON applications.package_id = packages.id
-JOIN users AS tutor ON bookings.tutor_id = tutor.id
-JOIN users AS student ON bookings.student_id = student.id
-WHERE bookings.id = ?
+      SELECT 
+        bookings.*, 
+        applications.snapshot_start_time, 
+        applications.snapshot_end_time,
+        applications.timeslot_id,
+        applications.package_id,
+        applications.id AS application_id,
+        packages.total_sessions,
+        packages.package_name,
+        CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
+        CONCAT(student.fname, ' ', student.lname) AS student_name,
+        tutor.email AS tutor_email,
+        student.email AS student_email
+      FROM bookings
+      JOIN applications ON bookings.application_id = applications.id
+      JOIN packages ON applications.package_id = packages.id
+      JOIN users AS tutor ON bookings.tutor_id = tutor.id
+      JOIN users AS student ON bookings.student_id = student.id
+      WHERE bookings.id = ?
     `, [bookingId]);
 
     if (bookings.length === 0) {
-      await connection.rollback();
-      connection.release();
-      return res.status(404).json({ error: 'Booking not found' });
+      throw { code: 404, message: 'Booking not found' };
     }
 
     const booking = bookings[0];
 
-    // 1.5 Check for conflicting 'upcoming' sessions
+    // 1.5 Check schedule conflict
     const [conflicts] = await connection.query(`
       SELECT sch.*
       FROM schedules sch
@@ -303,7 +323,7 @@ WHERE bookings.id = ?
         )
     `, [
       booking.tutor_id,
-      booking.student_id, 
+      booking.student_id,
       booking.session_date,
       booking.snapshot_end_time, booking.snapshot_end_time,
       booking.snapshot_start_time, booking.snapshot_start_time,
@@ -311,27 +331,19 @@ WHERE bookings.id = ?
     ]);
 
     if (conflicts.length > 0) {
-      await connection.rollback();
-      connection.release();
-      return res.status(409).json({
-        error: 'Schedule conflict detected.'
-      });
+      throw { code: 409, message: 'Schedule conflict detected.' };
     }
 
-    // 2. Update booking status
+    // 2. Accept booking
     const [updateResult] = await connection.query(`
-      UPDATE bookings
-      SET status = 'accepted'
-      WHERE id = ?
+      UPDATE bookings SET status = 'accepted' WHERE id = ?
     `, [bookingId]);
 
     if (updateResult.affectedRows === 0) {
-      await connection.rollback();
-      connection.release();
-      return res.status(404).json({ error: 'Failed to update booking' });
+      throw { code: 404, message: 'Failed to update booking' };
     }
 
-    // 3. Insert into schedules
+    // 3. Create schedule and session
     const [scheduleResult] = await connection.query(`
       INSERT INTO schedules (booking_id, tutor_id, student_id, scheduled_date, start_time, end_time)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -343,123 +355,122 @@ WHERE bookings.id = ?
       booking.snapshot_start_time,
       booking.snapshot_end_time
     ]);
-
     const scheduleId = scheduleResult.insertId;
 
-    // 4. Insert into sessions
     await connection.query(`
-      INSERT INTO sessions (schedule_id, status)
-      VALUES (?, 'upcoming')
+      INSERT INTO sessions (schedule_id, status) VALUES (?, 'upcoming')
     `, [scheduleId]);
 
-    // 5. Count accepted bookings for this application
-    const [acceptedCountResult] = await connection.query(`
+    // 4. Check if all bookings are accepted
+    const [[{ accepted_count }]] = await connection.query(`
       SELECT COUNT(*) AS accepted_count
       FROM bookings
       WHERE application_id = ? AND status = 'accepted'
     `, [booking.application_id]);
 
-    const acceptedCount = acceptedCountResult[0].accepted_count;
     let applicationMarkedDone = false;
 
-    // 6. If all sessions accepted, update timeslot and maybe application
-    if (acceptedCount === booking.total_sessions) {
-      // 6.1 Always update timeslot to 'available'
+    if (accepted_count === booking.total_sessions) {
+      // Always update timeslot
       await connection.query(`
-        UPDATE timeslots
-        SET status = 'available'
-        WHERE id = ?
+        UPDATE timeslots SET status = 'available' WHERE id = ?
       `, [booking.timeslot_id]);
 
-      // 6.2 Conditionally update application to 'done' based on payment status
-      const [payments] = await connection.query(`
+      // Check payment confirmation
+      const [[{ confirmed_count }]] = await connection.query(`
         SELECT COUNT(*) AS confirmed_count
         FROM payments
         WHERE application_id = ? AND is_confirmed = 1
       `, [booking.application_id]);
 
-      const confirmedCount = payments[0].confirmed_count;
-
-      const [appData] = await connection.query(`
-        SELECT paymentType
-        FROM applications
-        WHERE id = ?
+      const [[{ paymentType }]] = await connection.query(`
+        SELECT paymentType FROM applications WHERE id = ?
       `, [booking.application_id]);
 
-      const paymentType = appData[0].paymentType;
-
       const shouldMarkAsDone = (
-        (paymentType === 'partial' && confirmedCount >= 2) ||
-        (paymentType === 'full' && confirmedCount >= 1)
+        (paymentType === 'partial' && confirmed_count >= 2) ||
+        (paymentType === 'full' && confirmed_count >= 1)
       );
 
       if (shouldMarkAsDone) {
         await connection.query(`
-          UPDATE applications
-          SET application_status = 'done'
-          WHERE id = ?
+          UPDATE applications SET application_status = 'done' WHERE id = ?
         `, [booking.application_id]);
 
         applicationMarkedDone = true;
       }
     }
 
-    // 7. Commit transaction
+    // 5. Commit DB changes
     await connection.commit();
     connection.release();
 
-    // 8. Send In App Notifications
-    const sessionDate = new Date(booking.session_date);
-    const formattedDate = sessionDate.toLocaleDateString('en-US', {
+    // 6. Notifications (in-app and email)
+    const formattedDate = new Date(booking.session_date).toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
 
-    const studentMessage = `Your booking for ${formattedDate} has been accepted by ${booking.tutor_name}. Please be ready on your scheduled date.`;
-    const tutorMessage = `The booking of ${booking.student_name} on ${formattedDate} has been accepted.`;
+    const studentMsg = `Your booking for ${formattedDate} has been accepted by ${booking.tutor_name}. Please be ready on your scheduled date.`;
+    const tutorMsg = `The booking of ${booking.student_name} on ${formattedDate} has been accepted.`;
 
-    await createNotification(booking.student_id, studentMessage);
-    await createNotification(booking.tutor_id, tutorMessage);
+    await createNotification(booking.student_id, studentMsg);
+    await createNotification(booking.tutor_id, tutorMsg);
 
-    // ✉️ EMAIL NOTIFICATIONS — ADDED HERE
-    if (booking.student_email && booking.tutor_email) {
-      const emailSubject = 'TutorVise: Booking Accepted';
+    // ✉️ Send Emails
+    const emailSubject = 'TutorVise: Booking Accepted';
 
-      const studentEmailBody = `
-        <p>Dear ${booking.student_name},</p>
-        <p>Your tutorial session on <strong>${formattedDate}</strong> with <strong>${booking.tutor_name}</strong> has been accepted.</p>
-        <p>Please prepare accordingly. Thank you for using <strong>TutorVise</strong>.</p>
-      `;
-
-      const tutorEmailBody = `
-        <p>Dear ${booking.tutor_name},</p>
-        <p>You have successfully accepted a booking with <strong>${booking.student_name}</strong> scheduled on <strong>${formattedDate}</strong>.</p>
-        <p>Thank you for confirming this session.</p>
-      `;
-
-      await sendEmail(booking.student_email, emailSubject, studentEmailBody);
-      await sendEmail(booking.tutor_email, emailSubject, tutorEmailBody);
+    if (booking.student_email) {
+      await sendEmail(
+        booking.student_email,
+        emailSubject,
+        `<p>Dear ${booking.student_name},</p>
+         <p>Your tutorial session on <strong>${formattedDate}</strong> at <strong>${booking.snapshot_start_time} - ${booking.snapshot_end_time}</strong> with <strong>${booking.tutor_name}</strong> has been accepted.</p>
+         <p>Thank you for using <strong>TutorVise</strong>.</p>`
+      );
     }
-    // If application is marked as done, notify the student
 
+    if (booking.tutor_email) {
+      await sendEmail(
+        booking.tutor_email,
+        emailSubject,
+        `<p>Dear ${booking.tutor_name},</p>
+         <p>You have successfully accepted a booking with <strong>${booking.student_name}</strong> scheduled on <strong>${formattedDate}</strong> at <strong>${booking.snapshot_start_time} - ${booking.snapshot_end_time}</strong>.</p>
+         <p>Thank you for confirming this session.</p>`
+      );
+    }
+
+    // 7. If application marked done, notify student
     if (applicationMarkedDone) {
-      const successMessage = `Congratulations! All your bookings for this package "${booking.package_name}" have been accepted. You can now apply another package.`;
-      await createNotification(booking.student_id, successMessage);
+      const doneMessage = `Congratulations! All your bookings for the package "${booking.package_name}" have been accepted. You may now apply for another package.`;
+      await createNotification(booking.student_id, doneMessage);
+
+      const [[studentRow]] = await db.query(`
+        SELECT email, CONCAT(fname, ' ', lname) AS full_name FROM users WHERE id = ?
+      `, [booking.student_id]);
+
+      if (studentRow?.email) {
+        await sendEmail(
+          studentRow.email,
+          'All Bookings Accepted - TutorVise',
+          `Hi ${studentRow.full_name},\n\n${doneMessage}\n\nThank you for using TutorVise.`
+        );
+      }
     }
 
-    res.status(200).json({
-      message: 'Booking accepted, schedule and session created'
-    });
+    res.status(200).json({ message: 'Booking accepted, schedule and session created' });
 
   } catch (error) {
     if (connection) {
       await connection.rollback();
       connection.release();
     }
-    console.error('Error accepting booking:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
+    console.error('Error in acceptBooking:', error);
+    const code = error.code || 500;
+    const message = error.message || 'Internal server error';
+    res.status(code).json({ message });
   }
 };
-
 // Get bookings of a student
 exports.getBookingsByStudent = async (req, res) => {
   const studentId = req.params.studentId;

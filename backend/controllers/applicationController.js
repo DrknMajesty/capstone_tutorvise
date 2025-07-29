@@ -92,16 +92,17 @@ exports.submitPaymentProof = async (req, res) => {
     // ✅ Get the payment type, student info, and pricing details
     const [[app]] = await db.query(
       `
-SELECT 
-  a.paymentType, 
-  a.student_id, 
-  (CAST(p.price_package AS DECIMAL(10,2)) + (CAST(p.price_sessions AS DECIMAL(10,2)) * p.total_sessions)) AS package_cost,
-  CONCAT(u.fname, ' ', u.lname) AS student_name
-FROM applications a
-JOIN users u ON a.student_id = u.id
-JOIN packages p ON a.package_id = p.id
-WHERE a.id = ?
-       `,
+      SELECT 
+        a.paymentType, 
+        a.student_id, 
+        (CAST(p.price_package AS DECIMAL(10,2)) + (CAST(p.price_sessions AS DECIMAL(10,2)) * p.total_sessions)) AS package_cost,
+        CONCAT(u.fname, ' ', u.lname) AS student_name,
+        p.package_name
+      FROM applications a
+      JOIN users u ON a.student_id = u.id
+      JOIN packages p ON a.package_id = p.id
+      WHERE a.id = ?
+      `,
       [applicationId]
     );
 
@@ -110,37 +111,53 @@ WHERE a.id = ?
     }
 
     const isPartial = app.paymentType === 'partial';
-
-    // ✅ Calculate total fee
     const totalFee = Number(app.package_cost) || 0;
     const amountPaid = isPartial ? totalFee / 2 : totalFee;
 
-    // ✅ Save the payment proof in the payments table with amount_paid
+    // ✅ Save the payment proof
     await db.query(
       `INSERT INTO payments (application_id, payment_proof, is_partial, amount_paid, payment_date)
        VALUES (?, ?, ?, ?, NOW())`,
       [applicationId, paymentProof, isPartial, amountPaid]
     );
 
-    // ✅ Update application status and submission time
-await db.query(
-  `UPDATE applications 
-   SET application_status = CASE 
-     WHEN application_status != 'approved' THEN 'submitted' 
-     ELSE application_status 
-   END
-   WHERE id = ?`,
-  [applicationId]
-);
-
+    // ✅ Update application status if not already approved
+    await db.query(
+      `UPDATE applications 
+       SET application_status = CASE 
+         WHEN application_status != 'approved' THEN 'submitted' 
+         ELSE application_status 
+       END
+       WHERE id = ?`,
+      [applicationId]
+    );
 
     // ✅ Notify admins
-    const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'admin'`);
+    const [admins] = await db.query(`SELECT id, email FROM users WHERE account_type = 'admin'`);
+
     for (const admin of admins) {
       await createNotification(
         admin.id,
         `New ${isPartial ? 'partial' : 'full'} payment proof submitted by ${app.student_name}`
       );
+    }
+
+    // ✅ ✅ EMAIL NOTIFICATION TO ALL ADMINS
+    const emailSubject = 'TutorVise: Payment Proof Submission';
+
+    const paymentTypeText = isPartial ? 'a *partial* payment' : 'a *full* payment';
+
+    const emailBody = `
+      <p>Dear Admin,</p>
+      <p><strong>${app.student_name}</strong> has submitted ${paymentTypeText} proof for the package: <strong>${app.package_name}</strong>.</p>
+      <p>Please review and confirm the payment accordingly.</p>
+      <p>Regards,<br/>TutorVise System</p>
+    `;
+
+    for (const admin of admins) {
+      if (admin.email) {
+        await sendEmail(admin.email, emailSubject, emailBody);
+      }
     }
 
     res.json({ message: 'Payment proof submitted and awaiting admin approval.' });
@@ -597,17 +614,16 @@ exports.cancelPaymentProof = async (req, res) => {
 
 exports.confirmOrRejectPayment = async (req, res) => {
   const { paymentId } = req.params;
-  const { action } = req.body; // 'confirm' or 'reject'
+  const { action } = req.body;
 
   if (!['confirm', 'reject'].includes(action)) {
     return res.status(400).json({ message: 'Invalid action. Must be confirm or reject.' });
   }
 
   try {
-    // Fetch the payment and its application
     const [rows] = await db.query(
-      `SELECT p.id, p.application_id, p.is_confirmed
-       FROM payments p
+      `SELECT p.id, p.application_id, p.is_confirmed, a.student_id FROM payments p 
+       JOIN applications a ON p.application_id = a.id
        WHERE p.id = ?`,
       [paymentId]
     );
@@ -618,14 +634,26 @@ exports.confirmOrRejectPayment = async (req, res) => {
 
     const payment = rows[0];
 
-    if (action === 'confirm') {
-      // 1. Mark payment as confirmed
-      await db.query(
-        `UPDATE payments SET is_confirmed = 1 WHERE id = ?`,
-        [paymentId]
-      );
+    // Get student email and name
+    const [studentInfo] = await db.query(`
+      SELECT 
+        s.email AS student_email, 
+        CONCAT(s.fname, ' ', s.lname) AS student_name
+      FROM applications a
+      JOIN users s ON a.student_id = s.id
+      WHERE a.id = ?
+    `, [payment.application_id]);
 
-      // 2. If application is still submitted, update it to approved and set expires_at
+    const studentEmail = studentInfo[0]?.student_email;
+    const studentName = studentInfo[0]?.student_name;
+
+    if (!studentEmail) {
+      console.warn('Student email not found.');
+    }
+
+    if (action === 'confirm') {
+      await db.query(`UPDATE payments SET is_confirmed = 1 WHERE id = ?`, [paymentId]);
+
       const [appStatusRows] = await db.query(
         `SELECT application_status, timeslot_id FROM applications WHERE id = ?`,
         [payment.application_id]
@@ -636,15 +664,13 @@ exports.confirmOrRejectPayment = async (req, res) => {
 
       if (currentStatus === 'submitted') {
         const expiresAt = new Date();
-        expiresAt.setMonth(expiresAt.getMonth() + 1); // Set expiration to 1 month from now
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
 
-        // Approve the application
         await db.query(
           `UPDATE applications SET application_status = 'approved', expires_at = ? WHERE id = ?`,
           [expiresAt, payment.application_id]
         );
 
-        // Mark the associated timeslot from 'pending' to 'booked'
         if (timeslotId) {
           await db.query(
             `UPDATE timeslots SET status = 'booked' WHERE id = ?`,
@@ -653,24 +679,20 @@ exports.confirmOrRejectPayment = async (req, res) => {
         }
       }
 
-      // 3. Count confirmed partial and full payments
+      // Check confirmed payments
       const [partialConfirmed] = await db.query(`
-        SELECT COUNT(*) AS count
-        FROM payments
+        SELECT COUNT(*) AS count FROM payments
         WHERE application_id = ? AND is_partial = 1 AND is_confirmed = 1
       `, [payment.application_id]);
 
       const [fullConfirmed] = await db.query(`
-        SELECT COUNT(*) AS count
-        FROM payments
+        SELECT COUNT(*) AS count FROM payments
         WHERE application_id = ? AND is_partial = 0 AND is_confirmed = 1
       `, [payment.application_id]);
 
-      // 4. Check accepted bookings vs total sessions
+      // Check accepted bookings
       const [bookingStats] = await db.query(`
-        SELECT 
-          COUNT(*) AS accepted_count,
-          MAX(p.total_sessions) AS total_sessions
+        SELECT COUNT(*) AS accepted_count, MAX(p.total_sessions) AS total_sessions
         FROM bookings b
         JOIN applications a ON b.application_id = a.id
         JOIN packages p ON a.package_id = p.id
@@ -680,7 +702,6 @@ exports.confirmOrRejectPayment = async (req, res) => {
       const acceptedCount = bookingStats[0].accepted_count;
       const totalSessions = bookingStats[0].total_sessions;
 
-      // 5. Determine if conditions are met to mark application as done
       const paymentConditionMet = (partialConfirmed[0].count >= 2) || (fullConfirmed[0].count >= 1);
       const bookingConditionMet = acceptedCount === totalSessions;
 
@@ -689,46 +710,85 @@ exports.confirmOrRejectPayment = async (req, res) => {
           `UPDATE applications SET application_status = 'done' WHERE id = ?`,
           [payment.application_id]
         );
+
+        const [[packageInfo]] = await db.query(`
+          SELECT p.package_name
+          FROM applications a
+          JOIN packages p ON a.package_id = p.id
+          WHERE a.id = ?
+        `, [payment.application_id]);
+
+        const doneMessage = `Congratulations! All your bookings for the package "${packageInfo?.package_name}" have been accepted. You may now apply for another package.`;
+
+        // Send in-app notification
+        await createNotification(payment.student_id, doneMessage);
+
+        // Send email notification
+        if (studentEmail) {
+          await sendEmail(
+            studentEmail,
+            'All Bookings Accepted - TutorVise',
+            `<p>Dear ${studentName},</p>
+            <p>${doneMessage}</p>
+            <p>Thank you for using <strong>TutorVise</strong>.</p>`
+          );
+        }
+      }
+
+      // Send confirmation email
+      if (studentEmail) {
+        await sendEmail(
+          studentEmail,
+          'TutorVise Payment Confirmation',
+          `<p>Dear ${studentName},</p>
+          <p>Your payment has been <strong>confirmed</strong>.</p>
+          <p>Thank you for choosing TutorVise!</p>`
+        );
       }
 
       return res.json({ message: 'Payment confirmed successfully.' });
-    }
 
-    else if (action === 'reject') {
-        // Remove the payment record entirely
-        const [proofRow] = await db.query(
-          `SELECT payment_proof, application_id FROM payments WHERE id = ?`,
-          [paymentId]
-        );
+    } else if (action === 'reject') {
+      const [proofRow] = await db.query(
+        `SELECT payment_proof, application_id FROM payments WHERE id = ?`,
+        [paymentId]
+      );
 
-        if (proofRow.length > 0) {
-          const { payment_proof, application_id } = proofRow[0];
+      if (proofRow.length > 0) {
+        const { payment_proof, application_id } = proofRow[0];
 
-          // Delete the payment proof file if it exists
-          if (payment_proof) {
-            const fs = require('fs');
-            const filePath = `./uploads/payment_proofs/${payment_proof}`;
-            if (fs.existsSync(filePath)) {
-              fs.unlinkSync(filePath);
-            }
+        if (payment_proof) {
+          const fs = require('fs');
+          const filePath = `./uploads/payment_proofs/${payment_proof}`;
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
           }
-
-          // Delete the payment record
-          await db.query(`DELETE FROM payments WHERE id = ?`, [paymentId]);
-
-          // Update the application status to 'pending'
-          await db.query(
-            `UPDATE applications SET application_status = 'pending' WHERE id = ? AND application_status = 'submitted'`,
-            [application_id]
-          );
         }
 
-        return res.json({ message: 'Payment proof rejected, deleted, and application status set to pending.' });
+        await db.query(`DELETE FROM payments WHERE id = ?`, [paymentId]);
+
+        await db.query(
+          `UPDATE applications SET application_status = 'pending' WHERE id = ? AND application_status = 'submitted'`,
+          [application_id]
+        );
+
+        // Send rejection email
+        if (studentEmail) {
+          await sendEmail(
+            studentEmail,
+            'TutorVise Payment Rejected',
+            `<p>Dear ${studentName},</p>
+            <p>We regret to inform you that your submitted payment proof has been <strong>rejected</strong>. Please upload a valid proof to proceed with your application.</p>
+            <p>If you have questions, feel free to contact support.</p>`
+          );
+        }
       }
+
+      return res.json({ message: 'Payment proof rejected, deleted, and application status set to pending.' });
+    }
 
   } catch (err) {
     console.error('Admin payment confirmation error:', err);
     res.status(500).json({ message: 'Server error during payment action.' });
   }
 };
-
