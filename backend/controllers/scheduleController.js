@@ -46,23 +46,25 @@ ORDER BY schedules.scheduled_date, schedules.start_time;
   }
 };
 
+const { sendEmail } = require('../utils/emailService');
+
 exports.rescheduleSchedule = async (req, res) => {
   const scheduleId = parseInt(req.params.id, 10);
   const { user_id, scheduled_date, start_time, end_time } = req.body;
-  console.log('🛠️ Received user_id:', user_id);
 
   if (!scheduled_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'scheduled_date, start_time, and end_time are required' });
   }
 
   try {
-    // 1. Fetch the schedule details including names
     const [scheduleRows] = await db.query(`
       SELECT 
         schedules.tutor_id, 
         schedules.student_id,
         CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
-        CONCAT(student.fname, ' ', student.lname) AS student_name
+        CONCAT(student.fname, ' ', student.lname) AS student_name,
+        tutor.email AS tutor_email,
+        student.email AS student_email
       FROM schedules
       JOIN users AS tutor ON schedules.tutor_id = tutor.id
       JOIN users AS student ON schedules.student_id = student.id
@@ -73,9 +75,15 @@ exports.rescheduleSchedule = async (req, res) => {
       return res.status(404).json({ error: 'Schedule not found' });
     }
 
-    const { tutor_id, student_id, tutor_name, student_name } = scheduleRows[0];
+    const {
+      tutor_id,
+      student_id,
+      tutor_name,
+      student_name,
+      tutor_email,
+      student_email
+    } = scheduleRows[0];
 
-    // 2. Check for schedule conflicts
     const [conflicts] = await db.query(`
       SELECT 1 FROM schedules
       WHERE id != ?
@@ -104,21 +112,18 @@ exports.rescheduleSchedule = async (req, res) => {
       return res.status(409).json({ error: 'Conflict detected with existing schedule.' });
     }
 
-    // 3. Update the schedule
     await db.query(`
       UPDATE schedules
       SET scheduled_date = ?, start_time = ?, end_time = ?
       WHERE id = ?
     `, [scheduled_date, start_time, end_time, scheduleId]);
 
-    // 3.5. Update the corresponding session status to 'upcoming'
     await db.query(`
       UPDATE sessions
       SET status = 'upcoming'
       WHERE schedule_id = ?
     `, [scheduleId]);
 
-    // 4. Format message with 12-hour time
     const formattedDate = new Date(scheduled_date).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -146,25 +151,60 @@ exports.rescheduleSchedule = async (req, res) => {
       hour12: true
     });
 
-    const currentUserMsg = `You rescheduled a session of ${tutor_name} & ${student_name} to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`
+    const currentUserMsg = `You rescheduled a session of ${tutor_name} & ${student_name} to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
     const studentMessage = `Your session with ${tutor_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
     const tutorMessage = `Your session with ${student_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
 
-    // 5. Send notifications to student and tutor
-    await createNotification(user_id, currentUserMsg);
-    await createNotification(student_id, studentMessage);
-    await createNotification(tutor_id, tutorMessage);
+    // ✅ Notifications - fire without blocking
+    const notify = [
+      createNotification(user_id, currentUserMsg),
+      createNotification(student_id, studentMessage),
+      createNotification(tutor_id, tutorMessage)
+    ];
 
-    // 6. Notify all admins
     const [admins] = await db.query(`SELECT id FROM users WHERE account_type = 'Admin' AND status = 'active'`);
-
     const adminMessage = `Schedule between ${student_name} and ${tutor_name} has been rescheduled to ${formattedDate}, from ${formattedStartTime} to ${formattedEndTime}.`;
 
     for (const admin of admins) {
-      await createNotification(admin.id, adminMessage);
+      notify.push(createNotification(admin.id, adminMessage));
     }
 
-    return res.json({ message: 'Schedule updated successfully and notifications sent.' });
+    // Wait for all notifications in parallel, but do not throw if one fails
+    await Promise.allSettled(notify);
+
+    // ✅ Send emails in background
+    setImmediate(async () => {
+      try {
+        const subject = 'TutorVise: Session Rescheduled';
+
+        const studentEmailBody = `
+          <p>Dear ${student_name},</p>
+          <p>Your session with <strong>${tutor_name}</strong> has been rescheduled.</p>
+          <p><strong>Date:</strong> ${formattedDate}<br/>
+          <strong>Time:</strong> ${formattedStartTime} to ${formattedEndTime}</p>
+          <p>Please check your dashboard for updated details.</p>
+          <p>Regards,<br/>TutorVise System</p>
+        `;
+
+        const tutorEmailBody = `
+          <p>Dear ${tutor_name},</p>
+          <p>Your session with <strong>${student_name}</strong> has been rescheduled.</p>
+          <p><strong>Date:</strong> ${formattedDate}<br/>
+          <strong>Time:</strong> ${formattedStartTime} to ${formattedEndTime}</p>
+          <p>Please check your dashboard for updated details.</p>
+          <p>Regards,<br/>TutorVise System</p>
+        `;
+
+        await Promise.allSettled([
+          student_email && sendEmail(student_email, subject, studentEmailBody),
+          tutor_email && sendEmail(tutor_email, subject, tutorEmailBody)
+        ]);
+      } catch (e) {
+        console.error('Error sending reschedule emails:', e.message);
+      }
+    });
+
+    return res.json({ message: 'Schedule updated successfully and notifications queued.' });
 
   } catch (error) {
     console.error('Error rescheduling:', error.stack || error.message || error);

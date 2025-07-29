@@ -89,7 +89,7 @@ exports.submitPaymentProof = async (req, res) => {
   }
 
   try {
-    // ✅ Get the payment type, student info, and pricing details
+    // ✅ Get application, student, and pricing info
     const [[app]] = await db.query(
       `
       SELECT 
@@ -121,7 +121,7 @@ exports.submitPaymentProof = async (req, res) => {
       [applicationId, paymentProof, isPartial, amountPaid]
     );
 
-    // ✅ Update application status if not already approved
+    // ✅ Update application status
     await db.query(
       `UPDATE applications 
        SET application_status = CASE 
@@ -132,7 +132,7 @@ exports.submitPaymentProof = async (req, res) => {
       [applicationId]
     );
 
-    // ✅ Notify admins
+    // ✅ Notify admins in-app (synchronous)
     const [admins] = await db.query(`SELECT id, email FROM users WHERE account_type = 'admin'`);
 
     for (const admin of admins) {
@@ -142,10 +142,12 @@ exports.submitPaymentProof = async (req, res) => {
       );
     }
 
-    // ✅ ✅ EMAIL NOTIFICATION TO ALL ADMINS
-    const emailSubject = 'TutorVise: Payment Proof Submission';
+    // ✅ Respond immediately
+    res.json({ message: 'Payment proof submitted and awaiting admin approval.' });
 
-    const paymentTypeText = isPartial ? 'a *partial* payment' : 'a *full* payment';
+    // ✅ Send emails in the background (non-blocking)
+    const emailSubject = 'TutorVise: Payment Proof Submission';
+    const paymentTypeText = isPartial ? 'a <strong>partial</strong> payment' : 'a <strong>full</strong> payment';
 
     const emailBody = `
       <p>Dear Admin,</p>
@@ -154,13 +156,14 @@ exports.submitPaymentProof = async (req, res) => {
       <p>Regards,<br/>TutorVise System</p>
     `;
 
-    for (const admin of admins) {
+    // Async email send (non-blocking)
+    admins.forEach((admin) => {
       if (admin.email) {
-        await sendEmail(admin.email, emailSubject, emailBody);
+        sendEmail(admin.email, emailSubject, emailBody).catch((err) =>
+          console.error(`Error sending email to ${admin.email}:`, err)
+        );
       }
-    }
-
-    res.json({ message: 'Payment proof submitted and awaiting admin approval.' });
+    });
   } catch (err) {
     console.error('Error uploading proof:', err);
     res.status(500).json({ message: 'Server error.' });
@@ -634,7 +637,7 @@ exports.confirmOrRejectPayment = async (req, res) => {
 
     const payment = rows[0];
 
-    // Get student email and name
+    // Fetch student info
     const [studentInfo] = await db.query(`
       SELECT 
         s.email AS student_email, 
@@ -647,9 +650,7 @@ exports.confirmOrRejectPayment = async (req, res) => {
     const studentEmail = studentInfo[0]?.student_email;
     const studentName = studentInfo[0]?.student_name;
 
-    if (!studentEmail) {
-      console.warn('Student email not found.');
-    }
+    let emailTasks = [];
 
     if (action === 'confirm') {
       await db.query(`UPDATE payments SET is_confirmed = 1 WHERE id = ?`, [paymentId]);
@@ -679,19 +680,18 @@ exports.confirmOrRejectPayment = async (req, res) => {
         }
       }
 
-      // Check confirmed payments
-      const [partialConfirmed] = await db.query(`
+      // Check payment and booking conditions
+      const [[partialConfirmed]] = await db.query(`
         SELECT COUNT(*) AS count FROM payments
         WHERE application_id = ? AND is_partial = 1 AND is_confirmed = 1
       `, [payment.application_id]);
 
-      const [fullConfirmed] = await db.query(`
+      const [[fullConfirmed]] = await db.query(`
         SELECT COUNT(*) AS count FROM payments
         WHERE application_id = ? AND is_partial = 0 AND is_confirmed = 1
       `, [payment.application_id]);
 
-      // Check accepted bookings
-      const [bookingStats] = await db.query(`
+      const [[bookingStats]] = await db.query(`
         SELECT COUNT(*) AS accepted_count, MAX(p.total_sessions) AS total_sessions
         FROM bookings b
         JOIN applications a ON b.application_id = a.id
@@ -699,11 +699,8 @@ exports.confirmOrRejectPayment = async (req, res) => {
         WHERE b.application_id = ? AND b.status = 'accepted'
       `, [payment.application_id]);
 
-      const acceptedCount = bookingStats[0].accepted_count;
-      const totalSessions = bookingStats[0].total_sessions;
-
-      const paymentConditionMet = (partialConfirmed[0].count >= 2) || (fullConfirmed[0].count >= 1);
-      const bookingConditionMet = acceptedCount === totalSessions;
+      const paymentConditionMet = (partialConfirmed.count >= 2) || (fullConfirmed.count >= 1);
+      const bookingConditionMet = bookingStats.accepted_count === bookingStats.total_sessions;
 
       if (paymentConditionMet && bookingConditionMet) {
         await db.query(
@@ -720,33 +717,31 @@ exports.confirmOrRejectPayment = async (req, res) => {
 
         const doneMessage = `Congratulations! All your bookings for the package "${packageInfo?.package_name}" have been accepted. You may now apply for another package.`;
 
-        // Send in-app notification
         await createNotification(payment.student_id, doneMessage);
 
-        // Send email notification
         if (studentEmail) {
-          await sendEmail(
+          emailTasks.push(sendEmail(
             studentEmail,
             'All Bookings Accepted - TutorVise',
             `<p>Dear ${studentName},</p>
-            <p>${doneMessage}</p>
-            <p>Thank you for using <strong>TutorVise</strong>.</p>`
-          );
+             <p>${doneMessage}</p>
+             <p>Thank you for using <strong>TutorVise</strong>.</p>`
+          ));
         }
       }
 
-      // Send confirmation email
+      // Confirmation email
       if (studentEmail) {
-        await sendEmail(
+        emailTasks.push(sendEmail(
           studentEmail,
           'TutorVise Payment Confirmation',
           `<p>Dear ${studentName},</p>
           <p>Your payment has been <strong>confirmed</strong>.</p>
           <p>Thank you for choosing TutorVise!</p>`
-        );
+        ));
       }
 
-      return res.json({ message: 'Payment confirmed successfully.' });
+      res.json({ message: 'Payment confirmed successfully.' });
 
     } else if (action === 'reject') {
       const [proofRow] = await db.query(
@@ -772,19 +767,25 @@ exports.confirmOrRejectPayment = async (req, res) => {
           [application_id]
         );
 
-        // Send rejection email
         if (studentEmail) {
-          await sendEmail(
+          emailTasks.push(sendEmail(
             studentEmail,
             'TutorVise Payment Rejected',
             `<p>Dear ${studentName},</p>
-            <p>We regret to inform you that your submitted payment proof has been <strong>rejected</strong>. Please upload a valid proof to proceed with your application.</p>
+            <p>Your submitted payment proof has been <strong>rejected</strong>. Please upload a valid proof to proceed with your application.</p>
             <p>If you have questions, feel free to contact support.</p>`
-          );
+          ));
         }
       }
 
-      return res.json({ message: 'Payment proof rejected, deleted, and application status set to pending.' });
+      res.json({ message: 'Payment proof rejected, deleted, and application status set to pending.' });
+    }
+
+    // 🧵 Send emails asynchronously (non-blocking)
+    if (emailTasks.length > 0) {
+      Promise.allSettled(emailTasks).catch(err =>
+        console.error('Email sending failed:', err)
+      );
     }
 
   } catch (err) {

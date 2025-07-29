@@ -282,6 +282,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
         setApplication(null);
         setHasExpired(false);
         setWasCancelled(false);
+        setisDone(false);
         return;
       }
 
@@ -432,7 +433,7 @@ const handleWeekdaySelect = (weekdayIndex) => {
       setTimeslots([]);
       setShowModal(false);
       await fetchApplication();
-      setAlert({ message: 'Booking submitted successfully. Please wait for 24 hours for admin approval.', severity: 'success', show: true });
+      setAlert({ message: 'Application Generated Successfully. Please submit your payment proof.', severity: 'success', show: true });
     } catch (err) {
       console.error('Error submitting booking:', err);
       setAlert({ message: 'Failed to submit booking. ' + (err.response?.data?.message || ''), severity: 'error', show: true });
