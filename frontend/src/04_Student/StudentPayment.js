@@ -11,6 +11,8 @@ const StudentPayment = () => {
   const [error, setError] = useState('');
   const [selectedAppId, setSelectedAppId] = useState(null);
   const [view, setView] = useState('applications');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -54,12 +56,53 @@ const StudentPayment = () => {
     window.open(`http://localhost:5000/uploads/payment_proofs/${filename}`, '_blank');
   };
 
-  const totalRemaining = applications.reduce((sum, app) => {
-    const total = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
-    const paid = (app.payments || []).reduce((s, p) => s + parseFloat(p.amount_paid || 0), 0);
-    return sum + (total - paid);
-  }, 0);
+  const handleFilterChange = (e) => {
+    const [year, month] = e.target.value.split('-');
+    setSelectedMonth(month);
+    setSelectedYear(year);
+  };
   
+    const rawEntries = applications.flatMap((app) => {
+    const totalAmount = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
+    const entries = [];
+
+    entries.push({
+      id: `debit-${app.application_id}`,
+      date: app.created_at,
+      reference: `APP#${app.application_id}`,
+      description: `Fee for ${app.package_name}`,
+      debit: totalAmount,
+      credit: 0,
+    });
+
+    if (app.payments && app.payments.length > 0) {
+      app.payments.forEach((payment, index) => {
+        entries.push({
+          id: `credit-${payment.payment_id}`,
+          date: payment.payment_date,
+          reference: `PAY#${payment.payment_id}`,
+          description: `${payment.is_partial ? (index === 0 ? 'Initial' : 'Final') : 'Full'} payment for ${app.package_name}`,
+          debit: 0,
+          credit: parseFloat(payment.amount_paid),
+        });
+      });
+    }
+    return entries;
+  }).filter(entry => {
+    if (!selectedMonth || !selectedYear) return true;
+    const entryDate = new Date(entry.date);
+    return (
+      entryDate.getMonth() + 1 === parseInt(selectedMonth) &&
+      entryDate.getFullYear() === parseInt(selectedYear)
+    );
+  }).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  let runningBalance = 0;
+  const ledgerWithBalance = rawEntries.map((entry) => {
+    runningBalance += (entry.debit || 0) - (entry.credit || 0);
+    return { ...entry, balance: runningBalance };
+  });
+
   return (
     <div>
       <ResponsiveNavbar username={username} />
@@ -182,71 +225,44 @@ const StudentPayment = () => {
               </>
             )}
 
-{view === 'ledger' && (
+            {view === 'ledger' && (
               <div className="bg-white shadow rounded-lg p-6 border">
-                <h2 className="text-xl font-bold mb-4">Payment Ledger</h2>
-                <table className="w-full border text-sm">
-                  <thead>
-                    <tr className="bg-gray-100 text-left">
-                      <th className="px-4 py-2">Date</th>
-                      <th className="px-4 py-2">Reference</th>
-                      <th className="px-4 py-2">Description</th>
-                      <th className="px-4 py-2">Debit (₱)</th>
-                      <th className="px-4 py-2">Credit (₱)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applications
-                      .flatMap((app) => {
-                        const totalAmount = calculateTotalPrice(app.price_package, app.total_sessions, app.price_sessions);
-                        const totalFormatted = formatCurrency(totalAmount);
-                        const entries = [];
-
-                        entries.push({
-                          id: `debit-${app.application_id}`,
-                          date: app.created_at,
-                          reference: `APP#${app.application_id}`,
-                          description: `Fee for ${app.package_name}`,
-                          debit: totalFormatted,
-                          credit: ''
-                        });
-
-                        if (app.payments && app.payments.length > 0) {
-                          app.payments.forEach((payment, index) => {
-                            entries.push({
-                              id: `credit-${payment.payment_id}`,
-                              date: payment.payment_date,
-                              reference: `PAY#${payment.payment_id}`,
-                              description: `${payment.is_partial ? (index === 0 ? 'Initial' : 'Final') : 'Full'} payment for ${app.package_name}`,
-                              debit: '',
-                              credit: formatCurrency(payment.amount_paid)
-                            });
-                          });
-                        }
-                        return entries;
-                      })
-                      .sort((a, b) => new Date(a.date || '2100-01-01') - new Date(b.date || '2100-01-01'))
-                      .map((entry) => (
+                <div className="mb-4">
+                  <label className="mr-2 font-medium">Filter by Month:</label>
+                  <input
+                    type="month"
+                    onChange={handleFilterChange}
+                    className="border px-2 py-1 rounded"
+                  />
+                </div>
+                {ledgerWithBalance.length === 0 ? (
+                  <p className="text-center text-gray-500 italic mt-4">No ledger entries found for the selected month.</p>
+                ) : (
+                  <table className="w-full border text-sm">
+                    <thead>
+                      <tr className="bg-gray-100 text-left">
+                        <th className="px-4 py-2">Date</th>
+                        <th className="px-4 py-2">Reference</th>
+                        <th className="px-4 py-2">Description</th>
+                        <th className="px-4 py-2">Debit (₱)</th>
+                        <th className="px-4 py-2">Credit (₱)</th>
+                        <th className="px-4 py-2">Balance (₱)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerWithBalance.map((entry) => (
                         <tr key={entry.id} className="border-t">
                           <td className="px-4 py-2">{entry.date ? new Date(entry.date).toLocaleDateString() : ''}</td>
                           <td className="px-4 py-2">{entry.reference}</td>
                           <td className="px-4 py-2 font-medium">{entry.description}</td>
-                          <td className="px-4 py-2 text-red-600">{entry.debit}</td>
-                          <td className="px-4 py-2 text-green-600">{entry.credit}</td>
+                          <td className="px-4 py-2">{entry.debit ? formatCurrency(entry.debit) : ''}</td>
+                          <td className="px-4 py-2">{entry.credit ? formatCurrency(entry.credit) : ''}</td>
+                          <td className="px-4 py-2 font-semibold">{formatCurrency(entry.balance)}</td>
                         </tr>
                       ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t bg-gray-50 font-semibold">
-                      <td colSpan="4" className="px-4 py-2 text-right">Remaining Balance</td>
-                      <td className="px-4 py-2 text-right">
-                        <span className={totalRemaining <= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                          {formatCurrency(totalRemaining <= 0 ? 0 : totalRemaining)}
-                        </span>
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
           </>
