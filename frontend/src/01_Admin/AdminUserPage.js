@@ -120,24 +120,28 @@ const handleSubmit = async (e) => {
   }
 
   try {
-    if (isEdit) {
-      await apiService.put(`/users/update/${formData.id}`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      console.log('User updated successfully', formData);
-      setAlert({ message: 'User Updated Successfully.', severity: 'success', show: true });
-    } else {
-      await apiService.post('/users/create', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setAlert({ message: 'User Created Successfully.', severity: 'success', show: true });
-    }
+  if (isEdit) {
+    const response = await apiService.put(`/users/update/${formData.id}`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    const updateMsg = response?.data?.message || 'User Updated Successfully.';
+    setAlert({ message: updateMsg, severity: 'success', show: true });
+  } else {
+    const response = await apiService.post('/users/create', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
 
-    resetForm();
-    setShowForm(false);
-    fetchUsers();
+    // ✅ Show success message from backend if provided
+    const successMsg = response?.data?.message || 'User Created Successfully.';
+    setAlert({ message: successMsg, severity: 'success', show: true });
+  }
+
+  resetForm();
+  setShowForm(false);
+  fetchUsers();
   } catch (err) {
-    setAlert({ message: 'Error saving user. Please check input.', severity: 'error', show: true });
+  const backendMessage = err?.response?.data?.message || 'Error saving user. Please check input.';
+  setAlert({ message: backendMessage, severity: 'error', show: true });
   }
 };
 

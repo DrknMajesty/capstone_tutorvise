@@ -108,7 +108,7 @@ exports.getTutorProfileById = async (req, res) => {
 // Create a new user
 exports.createUser = async (req, res) => {
   const {
-    username, password, account_type, gender, 
+    username, password, account_type, gender,
     fname, mname, lname, birthdate, email, contact_no,
     parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no,
     certification, teaching_lvl, subject, experiences, graduate_at, major
@@ -122,7 +122,9 @@ exports.createUser = async (req, res) => {
 
   try {
     const [existing] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
-    if (existing.length > 0) return res.status(409).json({ message: 'Username already exists.' });
+    if (existing.length > 0) {
+      return res.status(409).json({ message: 'Username already exists. Please choose a different one.' });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -134,7 +136,6 @@ exports.createUser = async (req, res) => {
 
     const userId = userResult.insertId;
 
-    // Student Profile
     if (account_type === 'student') {
       await db.query(
         `INSERT INTO student_profile (user_id, parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no)
@@ -143,7 +144,6 @@ exports.createUser = async (req, res) => {
       );
     }
 
-    // Tutor Profile
     if (account_type === 'tutor') {
       await db.query(
         `INSERT INTO tutor_profile (user_id, certification, teaching_lvl, subject, experiences, graduate_at, major)
@@ -152,10 +152,12 @@ exports.createUser = async (req, res) => {
       );
     }
 
-    res.status(201).json({ message: 'User created', userId });
+    res.status(201).json({ message: 'New User Creation Successfull', userId });
   } catch (err) {
     console.error('Error creating user:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      message: err?.message || 'Server error while creating user.'
+    });
   }
 };
 
@@ -175,7 +177,7 @@ exports.updateUser = async (req, res) => {
     // Check if user exists
     const [userExists] = await db.query('SELECT profile_image_url FROM users WHERE id = ?', [userId]);
     if (userExists.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found.' });
     }
 
     const oldImage = userExists[0]?.profile_image_url;
@@ -186,6 +188,15 @@ exports.updateUser = async (req, res) => {
       fs.unlink(imagePath, (err) => {
         if (err) console.warn('Could not delete old image:', err);
       });
+    }
+
+    // Check for username conflict (ignore current user)
+    const [existingUsername] = await db.query(
+      'SELECT id FROM users WHERE username = ? AND id != ?',
+      [username, userId]
+    );
+    if (existingUsername.length > 0) {
+      return res.status(409).json({ message: 'Username already exists. Please choose a different one.' });
     }
 
     const shouldUpdatePassword = password && password.trim().length > 0;
@@ -219,7 +230,7 @@ exports.updateUser = async (req, res) => {
 
     await db.query(userUpdateQuery, params);
 
-    // Update or insert into student_profile if applicable
+    // Update or insert into student_profile
     if (account_type === 'student') {
       const [existingStudent] = await db.query('SELECT id FROM student_profile WHERE user_id = ?', [userId]);
 
@@ -240,7 +251,7 @@ exports.updateUser = async (req, res) => {
       }
     }
 
-    // Update or insert into tutor_profile if applicable
+    // Update or insert into tutor_profile
     if (account_type === 'tutor') {
       const [existingTutor] = await db.query('SELECT id FROM tutor_profile WHERE user_id = ?', [userId]);
 
@@ -261,13 +272,15 @@ exports.updateUser = async (req, res) => {
       }
     }
 
-    res.json({ message: 'User updated successfully' });
+    res.json({ message: 'User updated successfully.' });
   } catch (err) {
     console.error('Error updating user:', err);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({
+      message: 'Server error while updating user.',
+      error: err.message
+    });
   }
 };
-
 
 // Delete user account
 exports.deleteUser = async (req, res) => {
