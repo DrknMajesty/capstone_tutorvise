@@ -87,55 +87,65 @@ const StaffUserPage = () => {
     });
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  // Normalize and trim the input email
-  const trimmedEmail = formData.email.trim().toLowerCase();
+    // Normalize and trim the input email
+    const trimmedEmail = formData.email.trim().toLowerCase();
 
-  // Check for existing email (exclude current user if editing)
-  const emailExists = users.some(user =>
-    user.email.toLowerCase() === trimmedEmail &&
-    (!isEdit || user.id !== formData.id) // allow same email if it's the user being edited
-  );
+    // Check for existing email (exclude current user if editing)
+    const emailExists = users.some(user =>
+      user.email.toLowerCase() === trimmedEmail &&
+      (!isEdit || user.id !== formData.id) // allow same email if it's the user being edited
+    );
 
-  if (emailExists) {
-    setAlert({
-      message: 'Email already exists. Please use a different email.',
-      severity: 'error',
-      show: true,
-    });
-    return;
-  }
-
-  // Prepare form data
-  const form = new FormData();
-  for (const key in formData) {
-    if (formData[key]) {
-      form.append(key, formData[key]);
+    if (emailExists) {
+      setAlert({
+        message: 'Email already exists. Please use a different email.',
+        severity: 'error',
+        show: true,
+      });
+      return;
     }
-  }
 
-  try {
+    // If password field is blank during edit, don't include it
+    if (isEdit && (!formData.password || formData.password.trim() === '')) {
+      delete formData.password;
+    }
+
+    // Prepare form data
+    const form = new FormData();
+    for (const key in formData) {
+      if (formData[key]) {
+        form.append(key, formData[key]);
+      }
+    }
+
+    try {
     if (isEdit) {
-      await apiService.put(`/users/update/${formData.id}`, form, {
+      const response = await apiService.put(`/users/update/${formData.id}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setAlert({ message: 'User Updated Successfully.', severity: 'success', show: true });
+      const updateMsg = response?.data?.message || 'User Updated Successfully.';
+      setAlert({ message: updateMsg, severity: 'success', show: true });
     } else {
-      await apiService.post('/users/create', form, {
+      const response = await apiService.post('/users/create', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setAlert({ message: 'User Created Successfully.', severity: 'success', show: true });
+
+      // ✅ Show success message from backend if provided
+      const successMsg = response?.data?.message || 'User Created Successfully.';
+      setAlert({ message: successMsg, severity: 'success', show: true });
     }
 
     resetForm();
     setShowForm(false);
     fetchUsers();
-  } catch (err) {
-    setAlert({ message: 'Error saving user. Please check input.', severity: 'error', show: true });
-  }
-};
+    } catch (err) {
+    const backendMessage = err?.response?.data?.message || 'Error saving user. Please check input.';
+    setAlert({ message: backendMessage, severity: 'error', show: true });
+    }
+  };
 
   const handleViewUser = async (user) => {
     let extendedProfile = null;
