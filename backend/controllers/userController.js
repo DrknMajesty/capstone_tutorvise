@@ -77,7 +77,7 @@ exports.getStudentProfileById = async (req, res) => {
   const userId = req.params.id;
 
   try {
-    const [student] = await db.query('SELECT * FROM student_profile WHERE user_id = ?', [userId]);
+    const [student] = await db.query('SELECT * FROM parent_profile WHERE user_id = ?', [userId]);
 
     // Return null instead of 404 if profile is not found
     const profile = student.length > 0 ? student[0] : null;
@@ -138,7 +138,7 @@ exports.createUser = async (req, res) => {
 
     if (account_type === 'student') {
       await db.query(
-        `INSERT INTO student_profile (user_id, parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no)
+        `INSERT INTO parent_profile (user_id, parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [userId, parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no]
       );
@@ -230,20 +230,20 @@ exports.updateUser = async (req, res) => {
 
     await db.query(userUpdateQuery, params);
 
-    // Update or insert into student_profile
+    // Update or insert into parent_profile
     if (account_type === 'student') {
-      const [existingStudent] = await db.query('SELECT id FROM student_profile WHERE user_id = ?', [userId]);
+      const [existingStudent] = await db.query('SELECT id FROM parent_profile WHERE user_id = ?', [userId]);
 
       if (existingStudent.length > 0) {
         await db.query(
-          `UPDATE student_profile SET
+          `UPDATE parent_profile SET
             parent_fname = ?, parent_mname = ?, parent_lname = ?, parent_suffix = ?, parent_email = ?, parent_contact_no = ?
            WHERE user_id = ?`,
           [parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no, userId]
         );
       } else {
         await db.query(
-          `INSERT INTO student_profile 
+          `INSERT INTO parent_profile 
             (user_id, parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [userId, parent_fname, parent_mname, parent_lname, parent_suffix, parent_email, parent_contact_no]

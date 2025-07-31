@@ -926,10 +926,10 @@ INSERT INTO `sessions` (`id`, `schedule_id`, `status`, `created_at`, `updated_at
 -- --------------------------------------------------------
 
 --
--- Table structure for table `student_profile`
+-- Table structure for table `parent_profile`
 --
 
-CREATE TABLE `student_profile` (
+CREATE TABLE `parent_profile` (
   `id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
   `parent_fname` varchar(50) DEFAULT NULL,
@@ -941,10 +941,10 @@ CREATE TABLE `student_profile` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `student_profile`
+-- Dumping data for table `parent_profile`
 --
 
-INSERT INTO `student_profile` (`id`, `user_id`, `parent_fname`, `parent_mname`, `parent_suffix`, `parent_email`, `parent_contact_no`, `parent_lname`) VALUES
+INSERT INTO `parent_profile` (`id`, `user_id`, `parent_fname`, `parent_mname`, `parent_suffix`, `parent_email`, `parent_contact_no`, `parent_lname`) VALUES
 (1, 2, 'Maria', 'Lopez', NULL, 'maria.lopez@example.com', '09171234567', 'Drake'),
 (18, 32, 'Lita', 'Dacoylo', NULL, NULL, NULL, 'Agot'),
 (19, 33, 'Kenneth', NULL, NULL, NULL, NULL, 'Delantes'),
@@ -1146,9 +1146,9 @@ ALTER TABLE `sessions`
   ADD KEY `schedule_id` (`schedule_id`);
 
 --
--- Indexes for table `student_profile`
+-- Indexes for table `parent_profile`
 --
-ALTER TABLE `student_profile`
+ALTER TABLE `parent_profile`
   ADD PRIMARY KEY (`id`),
   ADD KEY `user_id` (`user_id`);
 
@@ -1226,9 +1226,9 @@ ALTER TABLE `sessions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=166;
 
 --
--- AUTO_INCREMENT for table `student_profile`
+-- AUTO_INCREMENT for table `parent_profile`
 --
-ALTER TABLE `student_profile`
+ALTER TABLE `parent_profile`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
@@ -1288,10 +1288,10 @@ ALTER TABLE `sessions`
   ADD CONSTRAINT `sessions_ibfk_1` FOREIGN KEY (`schedule_id`) REFERENCES `schedules` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `student_profile`
+-- Constraints for table `parent_profile`
 --
-ALTER TABLE `student_profile`
-  ADD CONSTRAINT `student_profile_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+ALTER TABLE `parent_profile`
+  ADD CONSTRAINT `parent_profile_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `timeslots`

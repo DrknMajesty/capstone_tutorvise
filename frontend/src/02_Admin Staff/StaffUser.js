@@ -170,8 +170,8 @@ const StaffUserPage = () => {
     try {
       if (user.account_type === 'student') {
         const res = await apiService.get(`/users/profile/student/${user.id}`);
-        const { id: student_profile_id, ...rest } = res.data;
-        extendedProfile = { ...rest, student_profile_id };
+        const { id: parent_profile_id, ...rest } = res.data;
+        extendedProfile = { ...rest, parent_profile_id };
       } else if (user.account_type === 'tutor') {
         const res = await apiService.get(`/users/profile/tutor/${user.id}`);
         const { id: tutor_profile_id, ...rest } = res.data;
