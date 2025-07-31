@@ -5,16 +5,20 @@ exports.getTutorRatingsReport = async (req, res) => {
 
   try {
     let query = `
-      SELECT 
-        u.id AS tutor_id,
-        CONCAT(u.fname, ' ', u.lname) AS name,
-        COUNT(f.rating) AS rating_count,
-        IFNULL(AVG(f.rating), 0) AS average_rating
-      FROM users u
-      JOIN schedules sch ON sch.tutor_id = u.id
-      JOIN sessions sess ON sess.schedule_id = sch.id
-      LEFT JOIN feedback f ON f.session_id = sess.id
-      WHERE u.account_type = 'tutor'
+SELECT 
+  u.id AS tutor_id,
+  CONCAT(u.fname, ' ', u.lname) AS name,
+  COUNT(f.rating) AS rating_count,
+  IFNULL(AVG(f.rating), 0) AS average_rating
+
+FROM users u
+JOIN applications a ON a.tutor_id = u.id
+JOIN bookings b ON b.application_id = a.id
+JOIN schedules sch ON sch.booking_id = b.id
+JOIN sessions sess ON sess.schedule_id = sch.id
+LEFT JOIN feedback f ON f.session_id = sess.id
+
+WHERE u.account_type = 'tutor'
     `;
 
     const params = [];
@@ -42,20 +46,28 @@ exports.getTutorFeedbackDetails = async (req, res) => {
     const [results] = await db.query(`
 SELECT 
   sch.scheduled_date,
-  sch.student_id,
+  student.id AS student_id,
   student.lname AS student_lname,
-  student.fname as student_fname,
+  student.fname AS student_fname,
   sch.start_time,
   sch.end_time,
   f.rating,
   f.comment
+
 FROM schedules sch
 JOIN sessions sess ON sess.schedule_id = sch.id
 JOIN feedback f ON f.session_id = sess.id
-JOIN users student ON student.id = sch.student_id
-WHERE sch.tutor_id = ?
+
+-- Join bookings → applications → users
+JOIN bookings b ON sch.booking_id = b.id
+JOIN applications a ON b.application_id = a.id
+JOIN users student ON a.student_id = student.id
+JOIN users tutor ON a.tutor_id = tutor.id
+
+WHERE a.tutor_id = ?
   AND sess.status = 'confirmed'
   AND f.rating IS NOT NULL
+
 ORDER BY sch.scheduled_date DESC, sch.start_time;
     `, [tutorId]);
       console.log("Data:", results);

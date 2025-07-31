@@ -169,13 +169,14 @@ exports.scheduleSessions = async (req, res) => {
     const { student_id, tutor_id, fname, lname } = appRows[0];
 
     // Insert each date as a new booking
-    const values = dates.map(date => [application_id, student_id, tutor_id, date]);
+    const values = dates.map(date => [application_id, date]);
 
     await db.query(
-      `INSERT INTO bookings (application_id, student_id, tutor_id, session_date)
-       VALUES ?`,
+      `INSERT INTO bookings (application_id, session_date)
+      VALUES ?`,
       [values]
     );
+
 
     // Create notifications for tutor and student
     const sessionCount = dates.length;
@@ -196,6 +197,7 @@ exports.scheduleSessions = async (req, res) => {
     return res.status(500).json({ message: 'Failed to book sessions' });
   }
 };
+
 // Get Application with Bookings
 exports.getAllApplicationsWithBookings = async (req, res) => {
   try {
@@ -294,6 +296,8 @@ exports.acceptBooking = async (req, res) => {
         applications.timeslot_id,
         applications.package_id,
         applications.id AS application_id,
+        applications.tutor_id AS tutor_id,
+        applications.student_id AS student_id,
         packages.total_sessions,
         packages.package_name,
         CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
@@ -303,8 +307,8 @@ exports.acceptBooking = async (req, res) => {
       FROM bookings
       JOIN applications ON bookings.application_id = applications.id
       JOIN packages ON applications.package_id = packages.id
-      JOIN users AS tutor ON bookings.tutor_id = tutor.id
-      JOIN users AS student ON bookings.student_id = student.id
+      JOIN users AS tutor ON applications.tutor_id = tutor.id
+      JOIN users AS student ON applications.student_id = student.id
       WHERE bookings.id = ?
     `, [bookingId]);
 
@@ -315,8 +319,10 @@ exports.acceptBooking = async (req, res) => {
     // Step 1.5: Check schedule conflict
     const [conflicts] = await connection.query(`
       SELECT sch.* FROM schedules sch
+      JOIN bookings b ON sch.booking_id = b.id
+      JOIN applications a ON b.application_id = a.id
       JOIN sessions s ON s.schedule_id = sch.id
-      WHERE sch.tutor_id = ? AND sch.student_id = ? AND sch.scheduled_date = ?
+      WHERE a.tutor_id = ? AND a.student_id = ? AND sch.scheduled_date = ?
         AND s.status = 'upcoming'
         AND (
           (sch.start_time < ? AND sch.end_time > ?) OR
@@ -343,12 +349,10 @@ exports.acceptBooking = async (req, res) => {
 
     // Step 3: Create schedule and session
     const [scheduleResult] = await connection.query(`
-      INSERT INTO schedules (booking_id, tutor_id, student_id, scheduled_date, start_time, end_time)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO schedules (booking_id, scheduled_date, start_time, end_time)
+      VALUES (?, ?, ?, ?)
     `, [
       booking.id,
-      booking.tutor_id,
-      booking.student_id,
       booking.session_date,
       booking.snapshot_start_time,
       booking.snapshot_end_time
@@ -544,10 +548,12 @@ exports.tutorBookingCancel = async (req, res) => {
       });
     }
 
-    // Fetch booking details
+    // Fetch booking details and related application info
     const [bookingCheck] = await db.query(
-      `SELECT b.id, b.status, b.tutor_id, b.student_id, b.session_date 
+      `SELECT b.id, b.status, b.application_id, b.session_date,
+              a.tutor_id, a.student_id
        FROM bookings b
+       JOIN applications a ON b.application_id = a.id
        WHERE b.id = ?`,
       [bookingId]
     );
@@ -589,14 +595,15 @@ exports.tutorBookingCancel = async (req, res) => {
 
     const tutorName = tutorResult.length > 0 ? tutorResult[0].tutor_name : 'The tutor';
 
-    // Format scheduled_date using native Date methods
+    // Format session date
     const dateObj = new Date(booking.session_date);
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    const formattedDate = dateObj.toLocaleDateString('en-US', options);
+    const formattedDate = dateObj.toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
 
     // Send notification to student
-    const message = `Your tutor ${tutorName} has cancelled your booking scheduled on ${formattedDate}. Reason: ${cancel_reason}`;
-    await createNotification(booking.student_id, message);
+    const studentMessage = `Your tutor ${tutorName} has cancelled your booking scheduled on ${formattedDate}. Reason: ${cancel_reason}`;
+    await createNotification(booking.student_id, studentMessage);
 
     // Send notification to tutor
     const tutorMessage = `You cancelled a student booking on ${formattedDate}. Reason: ${cancel_reason}`;

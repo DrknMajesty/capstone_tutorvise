@@ -5,25 +5,23 @@ const { createNotification } = require('../utils/notification'); // adjust path 
 exports.getAllSessions = async (req, res) => {
   try {
     const [rows] = await db.execute(`
-    SELECT 
-      s.id AS session_id,
-      s.status,
-      sc.scheduled_date,
-      sc.start_time,
-      sc.end_time,
-      student.lname AS student_name,
-      tutor.lname AS tutor_name,
-      packages.tutorial_type AS tutorial_type
+SELECT 
+  s.id AS session_id,
+  s.status,
+  sc.scheduled_date,
+  sc.start_time,
+  sc.end_time,
+  student.lname AS student_name,
+  tutor.lname AS tutor_name,
+  packages.tutorial_type AS tutorial_type
 
-    FROM sessions s
-    JOIN schedules sc ON s.schedule_id = sc.id
-    JOIN users AS student ON sc.student_id = student.id
-    JOIN users AS tutor ON sc.tutor_id = tutor.id
-
-    -- ✅ Add the necessary joins to reach packages
-    JOIN bookings ON sc.booking_id = bookings.id
-    JOIN applications ON bookings.application_id = applications.id
-    JOIN packages ON applications.package_id = packages.id;
+FROM sessions s
+JOIN schedules sc ON s.schedule_id = sc.id
+JOIN bookings ON sc.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN users AS student ON applications.student_id = student.id
+JOIN users AS tutor ON applications.tutor_id = tutor.id
+JOIN packages ON applications.package_id = packages.id;
     `);
     res.json(rows);
   } catch (err) {
@@ -61,14 +59,23 @@ exports.updateSessionStatus = async (req, res) => {
 
     // ✅ 2. Get session details including names and schedule info
     const [[sessionInfo]] = await db.query(`
-      SELECT sch.tutor_id, sch.student_id, sch.scheduled_date, sch.start_time,
-             CONCAT(tu.fname, ' ', tu.lname) AS tutor_name,
-             CONCAT(su.fname, ' ', su.lname) AS student_name
-      FROM sessions s
-      JOIN schedules sch ON s.schedule_id = sch.id
-      JOIN users tu ON sch.tutor_id = tu.id
-      JOIN users su ON sch.student_id = su.id
-      WHERE s.id = ?
+SELECT 
+  a.tutor_id,
+  a.student_id,
+  sch.scheduled_date,
+  sch.start_time,
+  CONCAT(tu.fname, ' ', tu.lname) AS tutor_name,
+  CONCAT(su.fname, ' ', su.lname) AS student_name
+
+FROM sessions s
+JOIN schedules sch ON s.schedule_id = sch.id
+JOIN bookings b ON sch.booking_id = b.id
+JOIN applications a ON b.application_id = a.id
+JOIN users tu ON a.tutor_id = tu.id
+JOIN users su ON a.student_id = su.id
+
+WHERE s.id = ?;
+
     `, [id]);
 
     if (!sessionInfo) {
@@ -148,14 +155,24 @@ exports.requestStatusUpdate = async (req, res) => {
 
   try {
     const [[session]] = await db.query(`
-      SELECT 
-        s.id, s.schedule_id, sch.student_id, sch.tutor_id, 
-        sch.scheduled_date, sch.start_time, sch.end_time,
-        CONCAT(u.fname, ' ', u.lname) AS tutor_name
-      FROM sessions s
-      JOIN schedules sch ON s.schedule_id = sch.id
-      JOIN users u ON sch.tutor_id = u.id
-      WHERE s.id = ?
+SELECT 
+  s.id,
+  s.schedule_id,
+  a.student_id,
+  a.tutor_id,
+  sch.scheduled_date,
+  sch.start_time,
+  sch.end_time,
+  CONCAT(tu.fname, ' ', tu.lname) AS tutor_name
+
+FROM sessions s
+JOIN schedules sch ON s.schedule_id = sch.id
+JOIN bookings b ON sch.booking_id = b.id
+JOIN applications a ON b.application_id = a.id
+JOIN users tu ON a.tutor_id = tu.id
+
+WHERE s.id = ?;
+
     `, [sessionId]);
 
     if (!session) {
@@ -223,22 +240,27 @@ function formatScheduleMessage(dateStr, startTime, endTime) {
 exports.getSessionLogs = async (req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT 
-        s.id AS session_id,
-        s.status,
-        s.updated_at,
-        sc.scheduled_date,
-        sc.start_time,
-        sc.end_time,
-        student.lname AS student_name,
-        tutor.lname AS tutor_name
-      FROM sessions s
-      JOIN schedules sc ON s.schedule_id = sc.id
-      JOIN users AS student ON sc.student_id = student.id
-      JOIN users AS tutor ON sc.tutor_id = tutor.id
-      WHERE s.status IN ('confirmed', 'missed') 
-      ORDER BY s.updated_at DESC 
-      LIMIT 20;
+SELECT 
+  s.id AS session_id,
+  s.status,
+  s.updated_at,
+  sc.scheduled_date,
+  sc.start_time,
+  sc.end_time,
+  student.lname AS student_name,
+  tutor.lname AS tutor_name
+
+FROM sessions s
+JOIN schedules sc ON s.schedule_id = sc.id
+JOIN bookings ON sc.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN users AS student ON applications.student_id = student.id
+JOIN users AS tutor ON applications.tutor_id = tutor.id
+
+WHERE s.status IN ('confirmed', 'missed') 
+ORDER BY s.updated_at DESC 
+LIMIT 20;
+
       `);
     res.json(rows);
   } catch (err) {
@@ -267,17 +289,21 @@ SELECT
 
 FROM sessions s
 JOIN schedules sc ON s.schedule_id = sc.id
-JOIN users AS student ON sc.student_id = student.id
-JOIN users AS tutor ON sc.tutor_id = tutor.id
 LEFT JOIN feedback f ON f.session_id = s.id
 
--- ✅ Joins to reach the packages table
+-- ✅ Join to bookings and applications
 JOIN bookings ON sc.booking_id = bookings.id
 JOIN applications ON bookings.application_id = applications.id
+
+-- ✅ Student and tutor now come from applications
+JOIN users AS student ON applications.student_id = student.id
+JOIN users AS tutor ON applications.tutor_id = tutor.id
+
 JOIN packages ON applications.package_id = packages.id
 
 WHERE tutor.id = ?
 ORDER BY sc.scheduled_date, sc.start_time;
+
       `,
       [id]
     );
@@ -325,13 +351,16 @@ SELECT
 
 FROM sessions s
 JOIN schedules sc ON s.schedule_id = sc.id
-JOIN users AS student ON sc.student_id = student.id
-JOIN users AS tutor ON sc.tutor_id = tutor.id
 LEFT JOIN feedback f ON f.session_id = s.id
 
--- ✅ Joins to access tutorial_type
+-- ✅ Join to bookings and applications
 JOIN bookings ON sc.booking_id = bookings.id
 JOIN applications ON bookings.application_id = applications.id
+
+-- ✅ Student and tutor joined from applications table
+JOIN users AS student ON applications.student_id = student.id
+JOIN users AS tutor ON applications.tutor_id = tutor.id
+
 JOIN packages ON applications.package_id = packages.id
 
 WHERE student.id = ?

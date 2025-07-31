@@ -6,23 +6,27 @@ const { createNotification } = require('./utils/notification');
 cron.schedule('*/5 * * * *', async () => {
   try {
     const [sessions] = await db.query(`
-      SELECT 
-        sessions.id AS session_id,
-        sessions.reminder_sent,
-        schedules.scheduled_date,
-        schedules.start_time,
-        schedules.student_id,
-        schedules.tutor_id,
-        CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
-        CONCAT(student.fname, ' ', student.lname) AS student_name
-      FROM sessions
-      JOIN schedules ON sessions.schedule_id = schedules.id
-      JOIN users AS tutor ON schedules.tutor_id = tutor.id
-      JOIN users AS student ON schedules.student_id = student.id
-      WHERE 
-        sessions.status = 'upcoming'
-        AND sessions.reminder_sent = FALSE
-        AND TIMESTAMPDIFF(MINUTE, NOW(), CONCAT(schedules.scheduled_date, ' ', schedules.start_time)) BETWEEN 0 AND 120
+SELECT 
+  sessions.id AS session_id,
+  sessions.reminder_sent,
+  schedules.scheduled_date,
+  schedules.start_time,
+  applications.student_id,
+  applications.tutor_id,
+  CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
+  CONCAT(student.fname, ' ', student.lname) AS student_name
+
+FROM sessions
+JOIN schedules ON sessions.schedule_id = schedules.id
+JOIN bookings ON schedules.booking_id = bookings.id
+JOIN applications ON bookings.application_id = applications.id
+JOIN users AS tutor ON applications.tutor_id = tutor.id
+JOIN users AS student ON applications.student_id = student.id
+
+WHERE 
+  sessions.status = 'upcoming'
+  AND sessions.reminder_sent = FALSE
+  AND TIMESTAMPDIFF(MINUTE, NOW(), CONCAT(schedules.scheduled_date, ' ', schedules.start_time)) BETWEEN 0 AND 120;
     `);
 
  for (const session of sessions) {

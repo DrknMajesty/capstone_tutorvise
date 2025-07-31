@@ -1,5 +1,6 @@
 const db = require('../db'); // your MySQL2 connection
 const { createNotification } = require('../utils/notification');
+const { sendEmail } = require('../utils/emailService');
 
 exports.getAllSchedules = async (req, res) => {
   try {
@@ -9,8 +10,9 @@ SELECT
   schedules.scheduled_date,
   schedules.start_time,
   schedules.end_time,
-  schedules.student_id,
-  schedules.tutor_id,
+
+  applications.student_id,
+  applications.tutor_id,
 
   student.fname AS student_first_name,
   student.lname AS student_last_name,
@@ -22,21 +24,26 @@ SELECT
 
 FROM schedules
 
--- Join student and tutor
-JOIN users AS student ON schedules.student_id = student.id
-JOIN users AS tutor ON schedules.tutor_id = tutor.id
-
--- Join booking → application → package path
+-- Link to booking
 JOIN bookings ON schedules.booking_id = bookings.id
+
+-- Link to application
 JOIN applications ON bookings.application_id = applications.id
+
+-- Join users via applications
+JOIN users AS student ON applications.student_id = student.id
+JOIN users AS tutor ON applications.tutor_id = tutor.id
+
+-- Join package info
 JOIN packages ON applications.package_id = packages.id
 
--- ✅ Join sessions and filter by 'upcoming'
+-- Join session
 JOIN sessions ON sessions.schedule_id = schedules.id
+
+-- Filter for upcoming
 WHERE sessions.status IN ('upcoming')
 
 ORDER BY schedules.scheduled_date, schedules.start_time;
-
     `);
 
     res.status(200).json(rows);
@@ -45,8 +52,6 @@ ORDER BY schedules.scheduled_date, schedules.start_time;
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
-const { sendEmail } = require('../utils/emailService');
 
 exports.rescheduleSchedule = async (req, res) => {
   const scheduleId = parseInt(req.params.id, 10);
@@ -58,17 +63,21 @@ exports.rescheduleSchedule = async (req, res) => {
 
   try {
     const [scheduleRows] = await db.query(`
-      SELECT 
-        schedules.tutor_id, 
-        schedules.student_id,
-        CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
-        CONCAT(student.fname, ' ', student.lname) AS student_name,
-        tutor.email AS tutor_email,
-        student.email AS student_email
-      FROM schedules
-      JOIN users AS tutor ON schedules.tutor_id = tutor.id
-      JOIN users AS student ON schedules.student_id = student.id
-      WHERE schedules.id = ?
+    SELECT 
+      applications.tutor_id,
+      applications.student_id,
+      CONCAT(tutor.fname, ' ', tutor.lname) AS tutor_name,
+      CONCAT(student.fname, ' ', student.lname) AS student_name,
+      tutor.email AS tutor_email,
+      student.email AS student_email
+
+    FROM schedules
+    JOIN bookings ON schedules.booking_id = bookings.id
+    JOIN applications ON bookings.application_id = applications.id
+    JOIN users AS tutor ON applications.tutor_id = tutor.id
+    JOIN users AS student ON applications.student_id = student.id
+
+    WHERE schedules.id = ?;
     `, [scheduleId]);
 
     if (scheduleRows.length === 0) {
@@ -85,14 +94,17 @@ exports.rescheduleSchedule = async (req, res) => {
     } = scheduleRows[0];
 
     const [conflicts] = await db.query(`
-      SELECT 1 FROM schedules
-      WHERE id != ?
-        AND scheduled_date = ?
-        AND (tutor_id = ? OR student_id = ?)
+      SELECT 1
+      FROM schedules sch
+      JOIN bookings b ON sch.booking_id = b.id
+      JOIN applications a ON b.application_id = a.id
+      WHERE sch.id != ?
+        AND sch.scheduled_date = ?
+        AND (a.tutor_id = ? OR a.student_id = ?)
         AND (
-          (start_time < ? AND end_time > ?) OR
-          (start_time < ? AND end_time > ?) OR
-          (start_time >= ? AND end_time <= ?)
+          (sch.start_time < ? AND sch.end_time > ?) OR
+          (sch.start_time < ? AND sch.end_time > ?) OR
+          (sch.start_time >= ? AND sch.end_time <= ?)
         )
       LIMIT 1
     `, [
@@ -100,12 +112,9 @@ exports.rescheduleSchedule = async (req, res) => {
       scheduled_date,
       tutor_id,
       student_id,
-      end_time,
-      start_time,
-      start_time,
-      end_time,
-      start_time,
-      end_time
+      end_time, start_time,
+      start_time, end_time,
+      start_time, end_time
     ]);
 
     if (conflicts.length > 0) {
