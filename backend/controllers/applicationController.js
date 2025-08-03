@@ -730,6 +730,10 @@ exports.confirmOrRejectPayment = async (req, res) => {
         }
       }
 
+      // ✅ Notify student of payment confirmation
+      const confirmMessage = `Your payment has been confirmed. Your application is now being processed.`;
+      await createNotification(payment.student_id, confirmMessage);
+
       // Confirmation email
       if (studentEmail) {
         emailTasks.push(sendEmail(
@@ -766,6 +770,10 @@ exports.confirmOrRejectPayment = async (req, res) => {
           `UPDATE applications SET application_status = 'pending' WHERE id = ? AND application_status = 'submitted'`,
           [application_id]
         );
+
+        // ✅ Notify student of rejection
+        const rejectMessage = `Your submitted payment proof has been rejected. Please upload a valid proof to proceed with your application.`;
+        await createNotification(payment.student_id, rejectMessage);
 
         if (studentEmail) {
           emailTasks.push(sendEmail(

@@ -888,85 +888,95 @@ const handleConfirmCancel = async () => {
               {application ? (
                 <>
                   {['approved', 'partially_paid'].includes(application.application_status) ? (
-        <div className="mt-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
-            {/* <h3 className="text-lg font-semibold">Select Dates for your Tutorial Sessions</h3> */}
-            <div className="flex gap-4 text-sm items-center">
-              <span className="font-medium">Legend:</span>
-              <Legend color="bg-blue-500" label="Selected" />
-              <Legend color="bg-yellow-100 border border-yellow-400" label="Pending" />
-              <Legend color="bg-green-100 border border-green-400" label="Scheduled" />
-            </div>
-            <div>
-              <p>
-                <strong>Remaining Sessions:</strong>{' '}
-                <span className="font-bold text-red-600">
-                  {application.remaining_sessions - selectedDates.length}
-                </span>
-              </p>
-            </div>
-          </div>
+                  <div className="mt-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
+                      {/* <h3 className="text-lg font-semibold">Select Dates for your Tutorial Sessions</h3> */}
+                      <div className="flex gap-4 text-sm items-center">
+                        <span className="font-medium">Legend:</span>
+                        <Legend color="bg-blue-500" label="Selected" />
+                        <Legend color="bg-yellow-100 border border-yellow-400" label="Pending" />
+                        <Legend color="bg-green-100 border border-green-400" label="Scheduled" />
+                      </div>
+                      <div>
+                        <p>
+                          <strong>Remaining Sessions:</strong>{' '}
+                          <span className="font-bold text-red-600">
+                            {application.remaining_sessions - selectedDates.length}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
 
-          <div className="flex justify-between items-center mb-4">
-            <button onClick={() => handleMonthChange(-1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">&lt; Prev</button>
-            <h4 className="text-xl font-bold">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h4>
-            <button onClick={() => handleMonthChange(1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next &gt;</button>
-          </div>
+                    <div className="flex justify-between items-center mb-4">
+                      <button onClick={() => handleMonthChange(-1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">&lt; Prev</button>
+                      <h4 className="text-xl font-bold">{months[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h4>
+                      <button onClick={() => handleMonthChange(1)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next &gt;</button>
+                    </div>
 
-          <div className="grid grid-cols-7 gap-1 mb-4">
-            {weekdays.map((day, index) => (
-              <button
-                key={day}
-                onClick={() => handleWeekdaySelect(index)}
-                className={`text-sm px-2 py-1 rounded font-semibold ${
-                  selectedWeekday === index ? 'bg-blue-200' : 'hover:bg-gray-100'
-                }`}
-              >
-                {day.substring(0, 3)}
-              </button>
-            ))}
-            {renderCalendar()}
-          </div>
+                    <div className="grid grid-cols-7 gap-1 mb-4">
+                      {weekdays.map((day, index) => (
+                        <button
+                          key={day}
+                          onClick={() => handleWeekdaySelect(index)}
+                          className={`text-sm px-2 py-1 rounded font-semibold ${
+                            selectedWeekday === index ? 'bg-blue-200' : 'hover:bg-gray-100'
+                          }`}
+                        >
+                          {day.substring(0, 3)}
+                        </button>
+                      ))}
+                      {renderCalendar()}
+                    </div>
 
-          {selectedDates.length > 0 && (
-            <div className="mb-4">
-              <p className="font-semibold">Selected Dates ({selectedDates.length}):</p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {selectedDates.sort().map(date => (
-                  <span key={date} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-                    {new Date(date).toLocaleDateString()}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+                    {selectedDates.length > 0 && (
+                      <div className="mb-4">
+                        <p className="font-semibold">Selected Dates ({selectedDates.length}):</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {selectedDates.sort().map(date => (
+                            <span key={date} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                              {new Date(date).toLocaleDateString()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-          <div className="flex gap-2 mt-4">
-            <button
-              onClick={() => {
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => {
 
-                setSelectedDates([]);
-                setSelectedWeekday(null);
-              }}
-              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSessionBooking}
-              disabled={selectedDates.length === 0}
-              className={`px-4 py-2 rounded text-white ${
-                selectedDates.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              Confirm {selectedDates.length} Session{selectedDates.length !== 1 ? 's' : ''}
-            </button>
-          </div>
-        </div>
+                          setSelectedDates([]);
+                          setSelectedWeekday(null);
+                        }}
+                        className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSessionBooking}
+                        disabled={selectedDates.length === 0}
+                        className={`px-4 py-2 rounded text-white ${
+                          selectedDates.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                      >
+                        Confirm {selectedDates.length} Session{selectedDates.length !== 1 ? 's' : ''}
+                      </button>
+                    </div>
+                  </div>
                   ) : (
-                            <div className="mt-4 mb-8 w-full p-4 bg-gray-100 border border-gray-400 text-gray-800 rounded">
-                                Please apply for a package first to book dates.
-                            </div>
+                      <div className="mt-4 mb-8 w-full p-4 bg-gray-100 border border-gray-400 text-gray-800 rounded">
+                        {['submitted', 'pending'].includes(application.application_status) ? (
+                          'Your application is pending. Please wait for approval.'
+                        ) : application.application_status === 'expired' ? (
+                          'Your application has expired. Please reapply for a package.'
+                        ) : application.application_status === 'Cancelled' ? (
+                          'Your application was cancelled. Please apply for a new package to book dates.'
+                        ) : application.application_status === 'done' ? (
+                          'All sessions have been completed for your package.'
+                        ) : (
+                          'Please apply for a package first to book dates.'
+                        )}
+                      </div>
                   )}
                 </>
               ) : (
@@ -975,9 +985,9 @@ const handleConfirmCancel = async () => {
                             </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
+            )}
+            </div>
+            </div>
 {/* Package Application Modal */}
       {showModal && (!application || hasExpired) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

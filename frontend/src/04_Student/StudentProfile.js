@@ -166,23 +166,47 @@ const StudentProfile = () => {
     setNewEmail({ ...newEmail, [e.target.name]: e.target.value });
   };
   // Function to handle contact number update
-  const handleContactNumberUpdate = async () => {
-    try {
-      await apiClient.put(`/users/update-contact/${userId}`, { contact_no: newContactNo.contact_no });
-      setAlert({ message: 'Contact number updated successfully.', severity: 'success', show: true });
-    } catch (err) {
-      if (err.response && err.response.status === 409) {
+const handleContactNumberUpdate = async () => {
+  try {
+    await apiClient.put(`/users/update-contact/${userId}`, { contact_no: newContactNo.contact_no });
+
+    setAlert({
+      message: 'Contact number updated successfully.',
+      severity: 'success',
+      show: true
+    });
+  } catch (err) {
+    if (err.response) {
+      if (err.response.status === 400) {
+        setAlert({
+          message: 'Please provide a valid contact number.',
+          severity: 'error',
+          show: true
+        });
+      } else if (err.response.status === 409) {
         setAlert({
           message: 'This contact number is already taken. Please use a different one.',
           severity: 'error',
           show: true
         });
       } else {
-        console.error('Failed to update email:', err);
-        setAlert({ message: 'Failed to update contact number.', severity: 'error', show: true });
+        setAlert({
+          message: 'Failed to update contact number.',
+          severity: 'error',
+          show: true
+        });
       }
+    } else {
+      console.error('Failed to update contact number:', err);
+      setAlert({
+        message: 'An unexpected error occurred.',
+        severity: 'error',
+        show: true
+      });
     }
-  };
+  }
+};
+
   // Contact Number Change handler
   const handleContactNumberChange = (e) => {
     const { name, value } = e.target;
