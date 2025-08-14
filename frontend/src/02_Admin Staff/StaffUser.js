@@ -90,23 +90,59 @@ const StaffUserPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Normalize and trim the input email
-    const trimmedEmail = formData.email.trim().toLowerCase();
+// Inside handleSubmit function (before uniqueness checks)
+const trimmedEmail = (formData.email || "").trim().toLowerCase();
+const trimmedContact = (formData.contact_no || "").trim();
 
-    // Check for existing email (exclude current user if editing)
-    const emailExists = users.some(user =>
-      user.email.toLowerCase() === trimmedEmail &&
-      (!isEdit || user.id !== formData.id) // allow same email if it's the user being edited
-    );
+// ✅ Required field checks
+if (!trimmedEmail) {
+  setAlert({
+    message: 'Email is required.',
+    severity: 'error',
+    show: true,
+  });
+  return;
+}
 
-    if (emailExists) {
-      setAlert({
-        message: 'Email already exists. Please use a different email.',
-        severity: 'error',
-        show: true,
-      });
-      return;
-    }
+if (!trimmedContact) {
+  setAlert({
+    message: 'Contact number is required.',
+    severity: 'error',
+    show: true,
+  });
+  return;
+}
+
+// ✅ Email uniqueness check
+const emailExists = users.some(user =>
+  user.email.toLowerCase() === trimmedEmail &&
+  (!isEdit || user.id !== formData.id)
+);
+
+if (emailExists) {
+  setAlert({
+    message: 'Email already exists. Please use a different email.',
+    severity: 'error',
+    show: true,
+  });
+  return;
+}
+
+// ✅ Contact number uniqueness check
+const contactExists = users.some(user =>
+  user.contact_no === trimmedContact &&
+  (!isEdit || user.id !== formData.id)
+);
+
+if (contactExists) {
+  setAlert({
+    message: 'Contact number already exists. Please use a different number.',
+    severity: 'error',
+    show: true,
+  });
+  return;
+}
+
 
     // If password field is blank during edit, don't include it
     if (isEdit && (!formData.password || formData.password.trim() === '')) {

@@ -81,7 +81,7 @@ exports.submitApplication = async (req, res) => {
     const student_name = studentRows[0]?.student_name || 'A student';
 
     // 4. Create 12-hour payment deadline
-    const deadline = new Date(Date.now() + 12 * 60 * 60 * 1000);
+    const deadline = new Date(Date.now() + 60 * 1000);  //const deadline = new Date(Date.now() + 60 * 1000) for 1 minute;
 
     // 5. Save application
     await db.query(

@@ -28,21 +28,32 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
 
   const [isChangePassword, setIsChangePassword] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, type, value, files } = e.target;
+const handleChange = (e) => {
+  const { name, type, value, files } = e.target;
 
-    if (type === 'file' && files && files[0]) {
-      const file = files[0];
-      setFormData((prev) => ({ ...prev, [name]: file }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+  if (type === 'file' && files && files[0]) {
+    const file = files[0];
+    setFormData((prev) => ({ ...prev, [name]: file }));
+  } else {
+    let newValue = value;
+
+    // ✅ Instantly block anything except letters and spaces
+    if (['fname', 'mname', 'lname', 'parent_fname', 'parent_mname', 'parent_lname'].includes(name)) {
+      // Prevent typing if last character is invalid
+      if (!/^[A-Za-z\s]*$/.test(newValue)) {
+        return; // ❌ Ignore this input change
+      }
     }
 
-    // Clear password error when typing
-    if (name === 'password' || name === 'confirmPassword') {
-      setPasswordError("");
-    }
-  };
+    setFormData((prev) => ({ ...prev, [name]: newValue }));
+  }
+
+  // Clear password error when typing
+  if (name === 'password' || name === 'confirmPassword') {
+    setPasswordError("");
+  }
+};
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -137,6 +148,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
 
           {/* General Fields */}
           <div className="grid grid-cols-2 gap-2 mb-4">
+            {/* UserName Field */}
             <FloatingField
               name="username"
               type="text"
@@ -149,9 +161,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               onChange={handleChange}
               required
             />
-            
-            
-
+            {/* Account Type */}
             <FloatingField
               type="select"
               name="account_type"
@@ -166,6 +176,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               disabled={isEdit}
               options={accountTypeOptions}
             />
+            {/* Gender */}
             <FloatingField
               type="select"
               name="gender"
@@ -180,23 +191,36 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               disabled={isEdit}
               options={genderOptions}
             />
+            {/* Email */}
             <FloatingField
               name="email"
               type="email"
-              label="Email"
+              label={
+                <span>
+                  Email <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.email || ""}
               onChange={handleChange}
+              required
             />
+            {/* Contact Number */}
             <FloatingField
               name="contact_no"
               type="text"
-              label="Contact No."
+              label={
+                <span>
+                  Contact Number <span className="text-red-500">*</span>
+                </span>
+              }
               value={formData.contact_no || ""}
               onChange={(e) => {
                 const input = e.target.value;
                 if (/^\d{0,11}$/.test(input)) handleChange(e);
               }}
+              required
             />
+            {/* BirthDate */}
             <FloatingField
               name="birthdate"
               type="date"
@@ -209,6 +233,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               onChange={handleChange}
               required
             />
+            {/* First Name */}
             <FloatingField
               name="fname"
               type="text"
@@ -221,6 +246,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
               onChange={handleChange}
               required
             />
+            
             <FloatingField
               name="mname"
               type="text"
@@ -279,7 +305,7 @@ const UserFormModal = ({ formData, setFormData, onSubmit, onClose, isEdit = fals
             </div>
           )}
 
-          {/* Student Fields */}
+          {/* Student Account Fields */}
           {formData.account_type === "student" && (
             <div className="grid grid-cols-2 gap-2 mb-2">
               <h4 className="col-span-2 text-md font-semibold">

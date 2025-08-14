@@ -120,6 +120,20 @@ exports.createUser = async (req, res) => {
     return res.status(400).json({ message: 'Required user fields missing.' });
   }
 
+  // ✅ Age validation for all accounts
+  const birth = new Date(birthdate);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  if (age < 3) {
+    return res.status(400).json({ message: 'Users must be at least 3 years old to register.' });
+  }
+
+
   try {
     const [existing] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
     if (existing.length > 0) {
@@ -181,6 +195,21 @@ exports.updateUser = async (req, res) => {
     }
 
     const oldImage = userExists[0]?.profile_image_url;
+
+    // ✅ Age validation for all accounts during update
+    if (birthdate) {
+      const birth = new Date(birthdate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+
+      if (age < 3) {
+        return res.status(400).json({ message: 'Users must be at least 3 years old.' });
+      }
+    }
 
     // If new image is uploaded, delete the old one
     if (oldImage && profile_image) {
